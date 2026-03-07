@@ -1,5 +1,4 @@
--- Enable UUID extension
-create extension if not exists "uuid-ossp";
+create extension if not exists pgcrypto;
 
 -- USERS (extends Supabase auth.users)
 create table public.users (
@@ -18,7 +17,7 @@ create table public.users (
 
 -- CONTACTS
 create table public.contacts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade not null,
   type text not null check (type in ('borrower','realtor','title','other')),
   first_name text not null,
@@ -42,7 +41,7 @@ create table public.contacts (
 
 -- LENDERS
 create table public.lenders (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   type text check (type in ('wholesale','retail','portfolio','hard_money')),
   is_system boolean default false,
@@ -62,7 +61,7 @@ insert into public.lenders (name, type, is_system) values
 
 -- LOAN FILES
 create table public.loan_files (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade not null,
   borrower_id uuid references public.contacts(id),
   lender_id uuid references public.lenders(id),
@@ -81,7 +80,7 @@ create table public.loan_files (
   rate_lock_date date,
   rate_lock_expires_at date,
   closing_date date,
-  portal_token text unique default encode(gen_random_bytes(32), 'hex'),
+  portal_token text unique default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
   portal_expires_at timestamptz default (now() + interval '120 days'),
   notes text,
   created_at timestamptz not null default now(),
@@ -90,7 +89,7 @@ create table public.loan_files (
 
 -- DOCUMENTS
 create table public.documents (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   loan_file_id uuid references public.loan_files(id) on delete cascade not null,
   type text not null check (type in ('w2','pay_stub','bank_statement','tax_return_1040','schedule_c','schedule_e','purchase_contract','mortgage_statement','drivers_license','social_security','gift_letter','voe','appraisal','title_report','homeowners_insurance','hoa_statement','rental_agreement','conditional_approval','other')),
   status text not null default 'pending' check (status in ('pending','uploaded','processing','verified','needs_attention','rejected','expired')),
@@ -112,7 +111,7 @@ create table public.documents (
 
 -- CONDITIONS
 create table public.conditions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   loan_file_id uuid references public.loan_files(id) on delete cascade not null,
   source text not null check (source in ('lender','internal','title','appraisal')),
   lender_condition_text text,
@@ -132,7 +131,7 @@ create table public.conditions (
 
 -- MESSAGES
 create table public.messages (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   loan_file_id uuid references public.loan_files(id) on delete cascade,
   contact_id uuid references public.contacts(id),
   user_id uuid references public.users(id) on delete cascade not null,
@@ -153,7 +152,7 @@ create table public.messages (
 
 -- LENDER SUBMISSIONS
 create table public.lender_submissions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   loan_file_id uuid references public.loan_files(id) on delete cascade not null,
   lender_id uuid references public.lenders(id) not null,
   submitted_by uuid references public.users(id) not null,
@@ -168,7 +167,7 @@ create table public.lender_submissions (
 
 -- PULSE EVENTS
 create table public.pulse_events (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   contact_id uuid references public.contacts(id) on delete cascade not null,
   user_id uuid references public.users(id) on delete cascade not null,
   event_type text not null check (event_type in ('rate_drop','equity_trigger','loan_anniversary','listing_activity','manual')),
@@ -182,7 +181,7 @@ create table public.pulse_events (
 
 -- TOKEN USAGE (cost monitoring)
 create table public.token_usage (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade not null,
   loan_file_id uuid references public.loan_files(id) on delete set null,
   module text not null,
