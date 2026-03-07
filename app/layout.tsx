@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { validateEnv } from "@/lib/env";
+
+// Fail fast on missing environment variables — surfaces misconfiguration
+// immediately rather than deep in a request handler.
+validateEnv();
 
 const inter = Inter({ subsets: ["latin"] });
 

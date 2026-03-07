@@ -12,6 +12,8 @@ import {
   Upload,
   ChevronLeft,
   Zap,
+  Calculator,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app.store";
@@ -21,12 +23,14 @@ import { Separator } from "@/components/ui/separator";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/loans", label: "Loan Files", icon: FileText },
+  { href: "/pricing", label: "Pricing Engine", icon: Calculator },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pulse", label: "Pulse", icon: Activity },
   { href: "/deadlines", label: "Deadlines", icon: Calendar },
 ];
 
 const settingsItems = [
+  { href: "/reports/mcr", label: "MCR Report", icon: BarChart3 },
   { href: "/import", label: "Import (ARIVE)", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

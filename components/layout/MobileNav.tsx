@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Activity, Calendar } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Activity, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/loans", label: "Loans", icon: FileText },
+  { href: "/pricing", label: "Pricing", icon: Calculator },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pulse", label: "Pulse", icon: Activity },
-  { href: "/deadlines", label: "Deadlines", icon: Calendar },
 ];
 
 export function MobileNav() {

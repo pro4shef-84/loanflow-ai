@@ -6,6 +6,8 @@ import { usePulseEvents, useUpdatePulseEvent } from "@/hooks/usePulse";
 import { LoanCard } from "@/components/loans/LoanCard";
 import { DeadlineAlert } from "@/components/loans/DeadlineAlert";
 import { PulseEventCard } from "@/components/pulse/PulseEventCard";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,6 +60,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <UpgradePrompt />
+      <OnboardingChecklist />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>

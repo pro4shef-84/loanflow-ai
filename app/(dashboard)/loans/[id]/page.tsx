@@ -79,11 +79,17 @@ export default function LoanDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview" asChild><Link href={`/loans/${id}`}>Overview</Link></TabsTrigger>
+          <TabsTrigger value="application" asChild><Link href={`/loans/${id}/application`}>1003</Link></TabsTrigger>
           <TabsTrigger value="documents" asChild><Link href={`/loans/${id}/documents`}>Documents</Link></TabsTrigger>
           <TabsTrigger value="conditions" asChild><Link href={`/loans/${id}/conditions`}>Conditions</Link></TabsTrigger>
           <TabsTrigger value="communications" asChild><Link href={`/loans/${id}/communications`}>Messages</Link></TabsTrigger>
+          <TabsTrigger value="aus" asChild><Link href={`/loans/${id}/aus`}>AUS</Link></TabsTrigger>
+          <TabsTrigger value="loan-estimate" asChild><Link href={`/loans/${id}/loan-estimate`}>Loan Estimate</Link></TabsTrigger>
+          <TabsTrigger value="preapproval" asChild><Link href={`/loans/${id}/preapproval`}>Pre-Approval</Link></TabsTrigger>
+          <TabsTrigger value="submission" asChild><Link href={`/loans/${id}/submission`}>Submission</Link></TabsTrigger>
+          <TabsTrigger value="disclosures" asChild><Link href={`/loans/${id}/disclosures`}>Disclosures</Link></TabsTrigger>
           <TabsTrigger value="readiness" asChild><Link href={`/loans/${id}/readiness`}>Readiness</Link></TabsTrigger>
         </TabsList>
       </Tabs>

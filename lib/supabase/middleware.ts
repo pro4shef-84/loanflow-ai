@@ -28,9 +28,9 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
-  const publicPaths = ["/login", "/signup", "/portal"];
-  const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
+  // Allow public routes and API routes (APIs handle their own auth)
+  const publicPaths = ["/login", "/signup", "/portal", "/api/", "/auth/"];
+  const isPublicPath = pathname === "/" || publicPaths.some((p) => pathname.startsWith(p));
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
