@@ -52,7 +52,7 @@ export interface PricingResult {
   miMonthly: number; // mortgage insurance
 }
 
-const BASE_RATES: Record<LoanProgramKey, number> = {
+export const HARDCODED_BASE_RATES: Record<LoanProgramKey, number> = {
   "30yr_fixed": 7.0,
   "20yr_fixed": 6.75,
   "15yr_fixed": 6.35,
@@ -60,6 +60,30 @@ const BASE_RATES: Record<LoanProgramKey, number> = {
   "7_1_arm": 6.75,
   "5_1_arm": 6.5,
 };
+
+// Structure from a parsed rate sheet — one entry per program
+export interface LiveRateEntry {
+  key: LoanProgramKey;
+  rates: { rate: number; par_price: number; points: number }[];
+}
+
+/** Pick the par rate (closest to price 100) from a live rate sheet program */
+function getParRate(entries: LiveRateEntry["rates"]): number | null {
+  if (!entries?.length) return null;
+  const sorted = [...entries].sort((a, b) => Math.abs(a.par_price - 100) - Math.abs(b.par_price - 100));
+  return sorted[0]?.rate ?? null;
+}
+
+/** Build base rates map: use live rates where available, fall back to hardcoded */
+function resolveBaseRates(liveRates?: LiveRateEntry[]): Record<LoanProgramKey, number> {
+  if (!liveRates?.length) return HARDCODED_BASE_RATES;
+  const resolved = { ...HARDCODED_BASE_RATES };
+  for (const entry of liveRates) {
+    const par = getParRate(entry.rates);
+    if (par !== null) resolved[entry.key] = par;
+  }
+  return resolved;
+}
 
 const PROGRAM_LABELS: Record<LoanProgramKey, string> = {
   "30yr_fixed": "30-Year Fixed",
@@ -128,7 +152,8 @@ function monthlyPayment(principal: number, annualRate: number, years: number): n
   return (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
 }
 
-export function calculatePricing(inputs: PricingInputs): PricingResult {
+export function calculatePricing(inputs: PricingInputs, liveRates?: LiveRateEntry[]): PricingResult {
+  const BASE_RATES = resolveBaseRates(liveRates);
   const ltv = Math.round((inputs.loanAmount / inputs.propertyValue) * 1000) / 10;
   const downPayment = inputs.propertyValue - inputs.loanAmount;
 

@@ -15,6 +15,7 @@ import {
   Calculator,
   BarChart3,
 } from "lucide-react";
+// FileText imported above
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app.store";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ const navItems = [
 
 const settingsItems = [
   { href: "/reports/mcr", label: "MCR Report", icon: BarChart3 },
+  { href: "/settings/rate-sheets", label: "Rate Sheets", icon: FileText },
   { href: "/import", label: "Import (ARIVE)", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

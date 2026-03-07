@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,9 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { RateCard } from "@/components/pricing/RateCard";
 import { FeeWorksheet } from "@/components/pricing/FeeWorksheet";
-import { calculatePricing, type PricingInputs } from "@/lib/utils/pricing-engine";
-import { Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { calculatePricing, type PricingInputs, type LiveRateEntry } from "@/lib/utils/pricing-engine";
+import { Calculator, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import Link from "next/link";
 
 const STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA",
@@ -37,10 +38,30 @@ type FormValues = {
   monthlyPropertyTax: string;
 };
 
+interface RateSheetSummary {
+  id: string;
+  lender_name: string;
+  effective_date: string | null;
+  status: string;
+  parsed_rates: { programs: LiveRateEntry[] } | null;
+}
+
 export default function PricingPage() {
   const [showFees, setShowFees] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState(0);
   const [result, setResult] = useState<ReturnType<typeof calculatePricing> | null>(null);
+  const [activeSheet, setActiveSheet] = useState<RateSheetSummary | null>(null);
+
+  // Load most recent parsed rate sheet on mount
+  useEffect(() => {
+    fetch("/api/rate-sheets")
+      .then((r) => r.json())
+      .then(({ data }) => {
+        const parsed = (data ?? []).find((s: RateSheetSummary) => s.status === "parsed" || s.status === "active");
+        if (parsed) setActiveSheet(parsed);
+      })
+      .catch(() => {});
+  }, []);
 
   const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
     defaultValues: {
@@ -78,12 +99,34 @@ export default function PricingPage() {
       monthlyInsurance: Number(values.monthlyInsurance),
       monthlyPropertyTax: Number(values.monthlyPropertyTax),
     };
-    setResult(calculatePricing(inputs));
+    const liveRates = activeSheet?.parsed_rates?.programs as LiveRateEntry[] | undefined;
+    setResult(calculatePricing(inputs, liveRates));
     setSelectedScenario(0);
   };
 
   return (
     <div className="space-y-6 max-w-6xl">
+      {activeSheet ? (
+        <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+          <FileText className="h-4 w-4 text-green-600 shrink-0" />
+          <span className="text-green-700">
+            Live rates from <strong>{activeSheet.lender_name}</strong>
+            {activeSheet.effective_date && ` · Effective ${activeSheet.effective_date}`}
+          </span>
+          <Link href="/settings/rate-sheets" className="ml-auto text-xs text-green-600 underline underline-offset-2">
+            Manage
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <FileText className="h-4 w-4 text-amber-600 shrink-0" />
+          <span className="text-amber-700">Using estimated rates —</span>
+          <Link href="/settings/rate-sheets" className="text-xs text-amber-600 underline underline-offset-2">
+            Import a lender rate sheet for live pricing
+          </Link>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <Calculator className="h-6 w-6 text-blue-600" />
         <div>

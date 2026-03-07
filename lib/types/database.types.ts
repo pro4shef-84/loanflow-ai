@@ -671,6 +671,57 @@ export interface Database {
         };
         Relationships: Relationships;
       };
+      rate_sheets: {
+        Row: {
+          id: string;
+          user_id: string;
+          lender_id: string | null;
+          lender_name: string;
+          effective_date: string | null;
+          expires_at: string | null;
+          file_path: string | null;
+          original_filename: string | null;
+          status: "processing" | "parsed" | "failed" | "active" | "superseded";
+          parsed_rates: Json | null;
+          parse_error: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          lender_id?: string | null;
+          lender_name: string;
+          effective_date?: string | null;
+          expires_at?: string | null;
+          file_path?: string | null;
+          original_filename?: string | null;
+          status?: "processing" | "parsed" | "failed" | "active" | "superseded";
+          parsed_rates?: Json | null;
+          parse_error?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lender_id?: string | null;
+          lender_name?: string;
+          effective_date?: string | null;
+          expires_at?: string | null;
+          file_path?: string | null;
+          original_filename?: string | null;
+          status?: "processing" | "parsed" | "failed" | "active" | "superseded";
+          parsed_rates?: Json | null;
+          parse_error?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: Relationships;
+      };
       disclosures: {
         Row: {
           id: string;
