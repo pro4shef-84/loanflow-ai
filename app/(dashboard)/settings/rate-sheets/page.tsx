@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Upload, FileText, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Mail, Copy, Check } from "lucide-react";
 
 interface ParsedProgram {
   key: string;
@@ -42,7 +42,16 @@ export default function RateSheetsPage() {
   const [lenderName, setLenderName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/user/ingest-token")
+      .then((r) => r.json())
+      .then(({ webhookUrl: url }) => { if (url) setWebhookUrl(url); })
+      .catch(() => {});
+  }, []);
 
   const fetchSheets = async () => {
     setLoading(true);
@@ -79,6 +88,13 @@ export default function RateSheetsPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const copyWebhook = () => {
+    if (!webhookUrl) return;
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const getParRate = (program: ParsedProgram): number | null => {
@@ -126,6 +142,39 @@ export default function RateSheetsPage() {
               }
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Email Inbound */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mail className="h-4 w-4" /> Email Forwarding (Auto-Import)
+          </CardTitle>
+          <CardDescription>
+            Forward any lender rate sheet email directly to your webhook URL — PDFs are parsed automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            When you receive a rate sheet email from your lender, forward it to your email provider&apos;s inbound parse address configured to POST to the URL below.
+          </p>
+          {webhookUrl ? (
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-slate-100 rounded px-3 py-2 font-mono truncate">
+                {webhookUrl}
+              </code>
+              <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={copyWebhook}>
+                {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          ) : (
+            <div className="h-9 bg-slate-100 rounded animate-pulse" />
+          )}
+          <p className="text-xs text-muted-foreground">
+            Works with <strong>SendGrid Inbound Parse</strong> or <strong>Postmark Inbound</strong>. Configure your MX record or inbound route to POST to this URL. Each attachment PDF will be parsed by Claude and added to your rate sheets.
+          </p>
         </CardContent>
       </Card>
 
