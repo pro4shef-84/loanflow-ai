@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { LOAN_TYPE_LABELS } from "@/lib/types/loan.types";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 
 const loanFormSchema = z.object({
   loan_type: z.enum(["purchase", "refinance", "heloc", "non_qm", "va", "fha", "usda"]),
@@ -95,7 +96,7 @@ export function LoanForm({ onSubmit, isLoading, defaultValues }: LoanFormProps) 
             id="loan_amount"
             type="number"
             placeholder="350000"
-            {...register("loan_amount", { valueAsNumber: true })}
+            {...register("loan_amount", { setValueAs: (v) => v === "" ? undefined : Number(v) || undefined })}
           />
         </div>
 
@@ -105,13 +106,24 @@ export function LoanForm({ onSubmit, isLoading, defaultValues }: LoanFormProps) 
             id="estimated_value"
             type="number"
             placeholder="425000"
-            {...register("estimated_value", { valueAsNumber: true })}
+            {...register("estimated_value", { setValueAs: (v) => v === "" ? undefined : Number(v) || undefined })}
           />
         </div>
 
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="property_address">Property Address</Label>
-          <Input id="property_address" placeholder="123 Main St" {...register("property_address")} />
+          <AddressAutocomplete
+            id="property_address"
+            value={watch("property_address") ?? ""}
+            placeholder="123 Main St — start typing to search"
+            onChange={(v) => setValue("property_address", v)}
+            onAddressSelect={(s) => {
+              setValue("property_address", s.street);
+              setValue("property_city", s.city);
+              setValue("property_state", s.state);
+              setValue("property_zip", s.zip);
+            }}
+          />
         </div>
 
         <div className="space-y-2">

@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, ArrowRight, CheckCircle, Plus, Trash2, Save } from "lucide-react";
 import Link from "next/link";
 import type { LoanApplication, AssetInfo, LiabilityInfo } from "@/lib/types/application.types";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 
 const STEPS = [
   { label: "Borrower Info", id: "borrower" },
@@ -178,9 +179,22 @@ export default function ApplicationPage({ params }: { params: Promise<{ id: stri
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2 sm:col-span-2">
               <Label>Street Address *</Label>
-              <Input
+              <AddressAutocomplete
                 value={application.current_address?.street ?? ""}
-                onChange={(e) => updateField("current_address", "street", e.target.value)}
+                placeholder="Start typing your address..."
+                onChange={(v) => updateField("current_address", "street", v)}
+                onAddressSelect={(s) => {
+                  setApplication((prev) => ({
+                    ...prev,
+                    current_address: {
+                      ...(prev.current_address ?? {}),
+                      street: s.street,
+                      city: s.city,
+                      state: s.state,
+                      zip: s.zip,
+                    },
+                  }));
+                }}
               />
             </div>
             <div className="space-y-2">
