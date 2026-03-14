@@ -144,9 +144,23 @@ export async function POST(request: NextRequest) {
     if (parsed.expires_date) {
       expiresAt = new Date(parsed.expires_date).toISOString();
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to parse rate sheet";
-    console.error("[rate-sheets/upload] Parse error:", msg);
+  } catch (err: unknown) {
+    let msg = "Failed to parse rate sheet";
+    if (err instanceof Error) {
+      msg = err.message;
+    }
+
+    // Detect Anthropic billing / credit errors and surface a user-friendly message
+    const errString = String(err);
+    if (
+      errString.includes("credit balance is too low") ||
+      errString.includes("billing") ||
+      errString.includes("purchase credits")
+    ) {
+      msg = "AI parsing is temporarily unavailable (billing limit reached). The file was uploaded — parsing will be retried.";
+    }
+
+    console.error("[rate-sheets/upload] Parse error:", errString);
     parseError = msg;
   }
 
