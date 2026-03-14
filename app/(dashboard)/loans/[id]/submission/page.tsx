@@ -59,11 +59,17 @@ export default function SubmissionPage({ params }: { params: Promise<{ id: strin
       .then(() => {})
       .catch(() => {});
 
-    // Fetch system lenders directly via Supabase (no dedicated route)
+    // Fetch existing submissions for this loan
     fetch("/api/loans/" + id + "/submission")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load submissions");
+        return r.json();
+      })
       .then(({ data }) => {
         if (Array.isArray(data)) setSubmissions(data);
+      })
+      .catch(() => {
+        // Failed to load submissions
       });
   }, [id]);
 

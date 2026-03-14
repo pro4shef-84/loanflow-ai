@@ -52,10 +52,16 @@ export default function DisclosuresPage({ params }: { params: Promise<{ id: stri
 
   const fetchDisclosures = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/loans/${id}/disclosures`);
-    const json = await res.json();
-    if (json.data) setDisclosures(json.data);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/loans/${id}/disclosures`);
+      if (!res.ok) throw new Error("Failed to load disclosures");
+      const json = await res.json();
+      if (json.data) setDisclosures(json.data);
+    } catch {
+      // Failed to load — disclosures array stays empty
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => { fetchDisclosures(); }, [fetchDisclosures]);
@@ -65,31 +71,38 @@ export default function DisclosuresPage({ params }: { params: Promise<{ id: stri
 
   const updateStatus = async (type: DisclosureType, status: DisclosureStatus) => {
     setSaving(type);
-    const existing = getRow(type);
+    try {
+      const existing = getRow(type);
 
-    if (existing) {
-      const res = await fetch(`/api/loans/${id}/disclosures`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ disclosureId: existing.id, status }),
-      });
-      const json = await res.json();
-      if (json.data) {
-        setDisclosures((prev) => prev.map((d) => d.id === existing.id ? json.data : d));
+      if (existing) {
+        const res = await fetch(`/api/loans/${id}/disclosures`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ disclosureId: existing.id, status }),
+        });
+        if (!res.ok) throw new Error("Failed to update disclosure");
+        const json = await res.json();
+        if (json.data) {
+          setDisclosures((prev) => prev.map((d) => d.id === existing.id ? json.data : d));
+        }
+      } else {
+        // First time touching this disclosure -- create it
+        const res = await fetch(`/api/loans/${id}/disclosures`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ disclosure_type: type, status }),
+        });
+        if (!res.ok) throw new Error("Failed to create disclosure");
+        const json = await res.json();
+        if (json.data) {
+          setDisclosures((prev) => [...prev, json.data]);
+        }
       }
-    } else {
-      // First time touching this disclosure — create it
-      const res = await fetch(`/api/loans/${id}/disclosures`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ disclosure_type: type, status }),
-      });
-      const json = await res.json();
-      if (json.data) {
-        setDisclosures((prev) => [...prev, json.data]);
-      }
+    } catch {
+      // Update failed silently
+    } finally {
+      setSaving(null);
     }
-    setSaving(null);
   };
 
   const getStatus = (type: DisclosureType): DisclosureStatus =>

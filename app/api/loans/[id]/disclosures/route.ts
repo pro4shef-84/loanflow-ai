@@ -55,9 +55,17 @@ export async function POST(
 
   if (!loan) return NextResponse.json(errorResponse("Not found"), { status: 404 });
 
+  // Set timestamp fields based on initial status
+  const timestamps: Record<string, string | null> = {};
+  const { status } = parsed.data;
+  if (status === "sent") timestamps.sent_at = new Date().toISOString();
+  if (status === "viewed") timestamps.viewed_at = new Date().toISOString();
+  if (status === "signed") timestamps.signed_at = new Date().toISOString();
+  if (status === "waived") timestamps.waived_at = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("disclosures")
-    .insert({ ...parsed.data, loan_file_id: id })
+    .insert({ ...parsed.data, ...timestamps, loan_file_id: id })
     .select()
     .single();
 

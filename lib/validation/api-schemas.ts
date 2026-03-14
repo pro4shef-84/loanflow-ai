@@ -138,6 +138,7 @@ export const createDisclosureSchema = z.object({
     "servicing", "arm_disclosure", "initial_escrow", "homeowners_insurance",
   ]),
   stage: z.enum(["initial", "revised", "final"]).default("initial"),
+  status: z.enum(["pending", "sent", "viewed", "signed", "waived"]).default("pending"),
   due_date: z.string().optional(),
   method: z.enum(["email", "in_person", "mail", "electronic"]).optional(),
   notes: z.string().max(2000).optional(),

@@ -44,7 +44,10 @@ export default function ApplicationPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     fetch(`/api/loans/${id}/application`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load application");
+        return r.json();
+      })
       .then(({ data }) => {
         if (data) {
           setApplication(data);
@@ -52,6 +55,9 @@ export default function ApplicationPage({ params }: { params: Promise<{ id: stri
           setAssets(data.assets ?? []);
           setLiabilities(data.liabilities ?? []);
         }
+      })
+      .catch(() => {
+        // Application may not exist yet — that's OK
       });
   }, [id]);
 
@@ -73,16 +79,25 @@ export default function ApplicationPage({ params }: { params: Promise<{ id: stri
       liabilities,
       step_completed: Math.max(application.step_completed ?? 0, step + 1),
     };
-    await fetch(`/api/loans/${id}/application`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    setApplication(payload);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    if (nextStep !== undefined) setStep(nextStep);
+    try {
+      const res = await fetch(`/api/loans/${id}/application`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? "Save failed");
+      }
+      setApplication(payload);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      if (nextStep !== undefined) setStep(nextStep);
+    } catch {
+      // Save failed silently for now — could add error state
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderStepContent = () => {

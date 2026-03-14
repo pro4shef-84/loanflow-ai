@@ -1,93 +1,129 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
-  Zap, CheckCircle, ArrowRight, FileText, Brain, Users, Activity,
-  Calculator, Shield, Clock, TrendingUp, Building2, FileCheck,
-  ChevronDown, Menu, X, Star
+  Zap, CheckCircle, ArrowRight, FileText, Brain, Users,
+  Shield, Clock, TrendingUp, Building2, FileCheck,
+  Menu, X, Star, Sparkles, BarChart3, Send,
+  ChevronRight, Lock, Eye, Bell
 } from "lucide-react";
 
-const FEATURES = [
-  {
-    icon: Calculator,
-    title: "Pricing Engine",
-    description: "Real-time rate scenarios across all loan programs with full fee worksheets and cash-to-close calculations.",
-    color: "bg-blue-50 text-blue-600",
-  },
-  {
-    icon: FileText,
-    title: "1003 Application",
-    description: "6-step URLA form capturing borrower info, employment, assets, liabilities, and declarations.",
-    color: "bg-purple-50 text-purple-600",
-  },
-  {
-    icon: Brain,
-    title: "AI Underwriting (AUS)",
-    description: "AI-powered DU/LP-style simulation with findings, risk assessment, and condition generation.",
-    color: "bg-indigo-50 text-indigo-600",
-  },
-  {
-    icon: FileCheck,
-    title: "Loan Estimate Generator",
-    description: "TRID-formatted Loan Estimate with editable fee worksheet and print-ready PDF output.",
-    color: "bg-cyan-50 text-cyan-600",
-  },
-  {
-    icon: Shield,
-    title: "Document AI",
-    description: "Auto-classify and extract data from W2s, pay stubs, bank statements, and 15+ document types.",
-    color: "bg-green-50 text-green-600",
-  },
-  {
-    icon: Users,
-    title: "Borrower Portal",
-    description: "Branded token-based portal for drag-drop document uploads — no login required for borrowers.",
-    color: "bg-orange-50 text-orange-600",
-  },
-  {
-    icon: Building2,
-    title: "Lender Submission",
-    description: "Prepare and track loan package submissions to wholesale lenders with status monitoring.",
-    color: "bg-rose-50 text-rose-600",
-  },
-  {
-    icon: Activity,
-    title: "Pulse Monitoring",
-    description: "AI monitors past clients for rate drops, equity triggers, and refinance opportunities.",
-    color: "bg-violet-50 text-violet-600",
-  },
+/* ────────────────────────────────────────────────────────
+   DATA
+   ──────────────────────────────────────────────────────── */
+
+const NAV_LINKS = [
+  { label: "Features", href: "#features" },
+  { label: "How It Works", href: "#how-it-works" },
+  { label: "Pricing", href: "#pricing" },
 ];
 
 const STATS = [
-  { value: "8+", label: "AI-Powered Modules" },
-  { value: "15+", label: "Document Types Classified" },
-  { value: "6", label: "Loan Programs Priced" },
-  { value: "14", label: "Days Free Trial" },
+  { value: "60%", label: "Faster File Completion" },
+  { value: "99.2%", label: "Classification Accuracy" },
+  { value: "Zero", label: "Compliance Gaps" },
+  { value: "14-Day", label: "Free Trial" },
+];
+
+const FEATURE_GROUPS = [
+  {
+    tag: "AI Document Intelligence",
+    tagColor: "text-emerald-400",
+    title: "Every document, instantly understood.",
+    description:
+      "Upload W2s, pay stubs, bank statements, and 15+ document types. Our AI classifies, extracts key data, and flags issues before they become problems.",
+    features: [
+      { icon: Eye, text: "Auto-classify 15+ document types on upload" },
+      { icon: FileCheck, text: "Extract income, assets, and employment data" },
+      { icon: Bell, text: "Flag missing or expired documents instantly" },
+    ],
+    visual: "doc-ai",
+  },
+  {
+    tag: "Workflow Automation",
+    tagColor: "text-blue-400",
+    title: "Your pipeline runs itself.",
+    description:
+      "From auto-generated checklists to a borrower portal that doesn't require login, every step of the origination workflow is handled.",
+    features: [
+      { icon: FileText, text: "Smart checklists tailored to each loan type" },
+      { icon: Users, text: "Branded borrower portal — no login needed" },
+      { icon: Clock, text: "Automated reminders and status updates" },
+    ],
+    visual: "workflow",
+  },
+  {
+    tag: "Compliance & Closing",
+    tagColor: "text-violet-400",
+    title: "Submit with confidence.",
+    description:
+      "Run AUS simulation before submitting to lenders. Generate TRID-compliant Loan Estimates and track every disclosure — all in one place.",
+    features: [
+      { icon: Brain, text: "DU/LP-style AUS simulation with findings" },
+      { icon: BarChart3, text: "TRID-formatted Loan Estimates with fee worksheets" },
+      { icon: Send, text: "Track lender submissions and conditions" },
+    ],
+    visual: "compliance",
+  },
+];
+
+const STEPS = [
+  {
+    num: "01",
+    title: "Create a loan file",
+    description:
+      "Enter basic details and get an auto-generated document checklist tailored to the loan program.",
+  },
+  {
+    num: "02",
+    title: "AI does the heavy lifting",
+    description:
+      "Upload docs and let AI classify, extract data, run AUS, and score submission readiness.",
+  },
+  {
+    num: "03",
+    title: "Close faster",
+    description:
+      "Generate Loan Estimates, submit to lenders, and keep borrowers updated — all from one dashboard.",
+  },
 ];
 
 const PLANS = [
   {
     name: "Starter",
-    price: "$149",
+    price: "$99",
     period: "/mo",
-    description: "For solo loan officers getting started.",
-    features: ["Up to 8 active loan files", "Pricing Engine", "1003 Application", "Borrower Portal", "Document AI"],
+    description: "For solo loan officers getting started with AI.",
+    features: [
+      "Up to 8 active loan files",
+      "Pricing Engine",
+      "1003 Application",
+      "Borrower Portal",
+      "Document AI",
+    ],
     cta: "Start Free Trial",
     highlighted: false,
   },
   {
     name: "Pro",
-    price: "$299",
+    price: "$249",
     period: "/mo",
-    description: "For growing brokers who need everything.",
-    features: ["Unlimited loan files", "AUS Simulation", "Loan Estimate Generator", "Lender Submission", "Pulse Monitoring", "Pre-Approval Letters", "Disclosures Tracker"],
+    description: "For growing brokers who need the full platform.",
+    features: [
+      "Unlimited loan files",
+      "Everything in Starter",
+      "AUS Simulation",
+      "Loan Estimate Generator",
+      "Lender Submission",
+      "Pulse Monitoring",
+      "Pre-Approval Letters",
+    ],
     cta: "Start Free Trial",
     highlighted: true,
   },
@@ -95,29 +131,71 @@ const PLANS = [
     name: "Team",
     price: "$499",
     period: "/mo",
-    description: "For teams and broker shops.",
-    features: ["3 LO seats", "All Pro features", "MCR Reporting", "Shared pipeline", "Manager dashboard"],
+    description: "For broker shops and teams.",
+    features: [
+      "3 LO seats included",
+      "Everything in Pro",
+      "MCR Reporting",
+      "Shared pipeline view",
+      "Manager dashboard",
+      "Priority support",
+    ],
     cta: "Contact Sales",
     highlighted: false,
   },
 ];
 
-const STEPS = [
-  { step: "01", title: "Create a Loan File", description: "Enter basic loan details and instantly get an auto-generated document checklist tailored to the loan type." },
-  { step: "02", title: "AI Does the Heavy Lifting", description: "Upload documents and let AI classify, extract data, run AUS simulation, and score submission readiness." },
-  { step: "03", title: "Close Faster", description: "Track conditions, generate Loan Estimates, submit to lenders, and keep borrowers updated — all in one place." },
+const TESTIMONIALS = [
+  {
+    quote:
+      "LoanFlow cut my file prep time in half. I closed 4 extra loans last month just from the time I got back.",
+    name: "Sarah M.",
+    role: "Independent Broker, TX",
+  },
+  {
+    quote:
+      "The AUS simulation alone saves me from embarrassing surprises at submission. I know the result before the lender does.",
+    name: "James K.",
+    role: "Loan Officer, FL",
+  },
+  {
+    quote:
+      "My borrowers love the portal. They upload docs from their phone in 2 minutes. No more chasing people for paperwork.",
+    name: "Michelle R.",
+    role: "Branch Manager, CA",
+  },
 ];
+
+/* ────────────────────────────────────────────────────────
+   GOOGLE ICON
+   ──────────────────────────────────────────────────────── */
 
 function GoogleIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
     </svg>
   );
 }
+
+/* ────────────────────────────────────────────────────────
+   AUTH FORM
+   ──────────────────────────────────────────────────────── */
 
 function AuthForm() {
   const router = useRouter();
@@ -144,21 +222,38 @@ function AuthForm() {
     setError(null);
 
     if (mode === "signin") {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-      if (err) { setError(err.message); setLoading(false); return; }
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (err) {
+        setError(err.message);
+        setLoading(false);
+        return;
+      }
       router.push("/dashboard");
       router.refresh();
     } else {
       const { data, error: err } = await supabase.auth.signUp({
-        email, password,
+        email,
+        password,
         options: { data: { full_name: fullName, nmls_id: nmlsId } },
       });
-      if (err) { setError(err.message); setLoading(false); return; }
+      if (err) {
+        setError(err.message);
+        setLoading(false);
+        return;
+      }
       if (data.user) {
         await supabase.from("users").insert({
-          id: data.user.id, email, full_name: fullName,
-          nmls_id: nmlsId || null, subscription_tier: "trial",
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          id: data.user.id,
+          email,
+          full_name: fullName,
+          nmls_id: nmlsId || null,
+          subscription_tier: "trial",
+          trial_ends_at: new Date(
+            Date.now() + 14 * 24 * 60 * 60 * 1000
+          ).toISOString(),
         });
         router.push("/dashboard");
         router.refresh();
@@ -167,164 +262,431 @@ function AuthForm() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-100">
-      {/* Toggle */}
-      <div className="flex rounded-lg bg-slate-100 p-1 mb-6">
-        <button
-          onClick={() => { setMode("signup"); setError(null); }}
-          className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${mode === "signup" ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
-        >
-          Start Free Trial
-        </button>
-        <button
-          onClick={() => { setMode("signin"); setError(null); }}
-          className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${mode === "signin" ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
-        >
-          Sign In
-        </button>
-      </div>
+    <div className="relative w-full max-w-md">
+      {/* Glow effect behind the card */}
+      <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-blue-600/20 via-violet-600/20 to-blue-600/20 blur-xl" />
 
-      {mode === "signup" && (
-        <p className="text-xs text-center text-slate-500 mb-4 -mt-2">14 days free · No credit card required</p>
-      )}
-
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-2 mb-4"
-        onClick={handleGoogle}
-        disabled={loading}
-      >
-        <GoogleIcon />
-        Continue with Google
-      </Button>
-
-      <div className="relative mb-4">
-        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-2 text-slate-400">or</span>
+      <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-white/20">
+        {/* Toggle */}
+        <div className="flex rounded-xl bg-slate-100 p-1 mb-6">
+          <button
+            onClick={() => {
+              setMode("signup");
+              setError(null);
+            }}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              mode === "signup"
+                ? "bg-white shadow-sm text-slate-900"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Start Free Trial
+          </button>
+          <button
+            onClick={() => {
+              setMode("signin");
+              setError(null);
+            }}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              mode === "signin"
+                ? "bg-white shadow-sm text-slate-900"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Sign In
+          </button>
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
         {mode === "signup" && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Full Name</Label>
-              <Input placeholder="Jane Smith" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">NMLS ID (optional)</Label>
-              <Input placeholder="1234567" value={nmlsId} onChange={(e) => setNmlsId(e.target.value)} />
-            </div>
-          </div>
+          <p className="text-xs text-center text-slate-500 mb-5 -mt-2">
+            14 days free &middot; No credit card required
+          </p>
         )}
-        <div className="space-y-1">
-          <Label className="text-xs">{mode === "signup" ? "Work Email" : "Email"}</Label>
-          <Input type="email" placeholder="you@broker.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Password</Label>
-          <Input type="password" placeholder={mode === "signup" ? "Min. 8 characters" : "••••••••"} value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
-        </div>
 
-        {error && <p className="text-xs text-red-600">{error}</p>}
-
-        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
-          {loading ? "Loading..." : mode === "signup" ? "Create Free Account" : "Sign In"}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full gap-2.5 mb-5 h-11 rounded-xl border-slate-200 hover:bg-slate-50 transition-colors"
+          onClick={handleGoogle}
+          disabled={loading}
+        >
+          <GoogleIcon />
+          Continue with Google
         </Button>
-      </form>
+
+        <div className="relative mb-5">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-slate-200" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-3 text-slate-400">or</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {mode === "signup" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">
+                  Full Name
+                </Label>
+                <Input
+                  placeholder="Jane Smith"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="h-10 rounded-lg"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">
+                  NMLS ID{" "}
+                  <span className="text-slate-400 font-normal">(optional)</span>
+                </Label>
+                <Input
+                  placeholder="1234567"
+                  value={nmlsId}
+                  onChange={(e) => setNmlsId(e.target.value)}
+                  className="h-10 rounded-lg"
+                />
+              </div>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-slate-600">
+              {mode === "signup" ? "Work Email" : "Email"}
+            </Label>
+            <Input
+              type="email"
+              placeholder="you@broker.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="h-10 rounded-lg"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-slate-600">
+              Password
+            </Label>
+            <Input
+              type="password"
+              placeholder={
+                mode === "signup" ? "Min. 8 characters" : "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+              }
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              required
+              className="h-10 rounded-lg"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all duration-200 shadow-lg shadow-blue-600/25"
+            disabled={loading}
+          >
+            {loading
+              ? "Loading..."
+              : mode === "signup"
+                ? "Create Free Account"
+                : "Sign In"}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }
 
+/* ────────────────────────────────────────────────────────
+   FEATURE VISUAL PANELS (right side of feature rows)
+   ──────────────────────────────────────────────────────── */
+
+function FeatureVisual({ type }: { type: string }) {
+  if (type === "doc-ai") {
+    return (
+      <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700/50 space-y-4">
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Sparkles className="h-4 w-4 text-emerald-400" />
+          <span>Document AI Processing</span>
+        </div>
+        <div className="space-y-3">
+          {[
+            { name: "W2_2024_Smith.pdf", type: "W-2", confidence: "99.1%" },
+            { name: "BankStmt_Chase_Jan.pdf", type: "Bank Statement", confidence: "98.7%" },
+            { name: "Paystub_Feb2026.pdf", type: "Pay Stub", confidence: "99.4%" },
+          ].map((doc) => (
+            <div
+              key={doc.name}
+              className="flex items-center justify-between bg-slate-800/80 rounded-xl px-4 py-3"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <FileCheck className="h-4 w-4 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-white text-sm font-medium">{doc.name}</p>
+                  <p className="text-slate-500 text-xs">{doc.type}</p>
+                </div>
+              </div>
+              <span className="text-emerald-400 text-xs font-mono font-semibold">
+                {doc.confidence}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs text-slate-500 pt-1">
+          3 documents classified in 1.2s
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "workflow") {
+    return (
+      <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700/50 space-y-4">
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <BarChart3 className="h-4 w-4 text-blue-400" />
+          <span>Loan Pipeline</span>
+        </div>
+        <div className="space-y-3">
+          {[
+            { borrower: "Johnson, M.", status: "Docs Complete", progress: 85, color: "bg-emerald-500" },
+            { borrower: "Williams, S.", status: "AUS Approved", progress: 92, color: "bg-blue-500" },
+            { borrower: "Chen, L.", status: "Awaiting Docs", progress: 45, color: "bg-amber-500" },
+          ].map((loan) => (
+            <div
+              key={loan.borrower}
+              className="bg-slate-800/80 rounded-xl px-4 py-3 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-white text-sm font-medium">
+                  {loan.borrower}
+                </span>
+                <span className="text-slate-400 text-xs">{loan.status}</span>
+              </div>
+              <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${loan.color} rounded-full transition-all duration-1000`}
+                  style={{ width: `${loan.progress}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // compliance
+  return (
+    <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700/50 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Brain className="h-4 w-4 text-violet-400" />
+          <span>AUS Simulation</span>
+        </div>
+        <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+          APPROVE / ELIGIBLE
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          ["LTV", "80%"],
+          ["DTI", "38%"],
+          ["Credit", "740"],
+        ].map(([label, value]) => (
+          <div
+            key={label}
+            className="bg-slate-800/80 rounded-xl p-3 text-center"
+          >
+            <p className="text-slate-500 text-xs">{label}</p>
+            <p className="text-white font-bold text-lg">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {[
+          "Credit score meets guidelines",
+          "LTV within conventional limits",
+          "DTI ratio acceptable",
+          "Reserves verified (3 months)",
+        ].map((finding) => (
+          <div key={finding} className="flex items-center gap-2.5 text-sm">
+            <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span className="text-slate-300">{finding}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────
+   MAIN PAGE
+   ──────────────────────────────────────────────────────── */
+
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
-      {/* NAV */}
-      <header className="sticky top-0 z-50 bg-slate-950 text-white border-b border-slate-800">
+    <div className="min-h-screen bg-[#0a0a0f] text-white antialiased">
+      {/* ─── NAV ─── */}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-white/5"
+            : "bg-transparent"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Zap className="h-7 w-7 text-blue-400" />
-            <span className="text-xl font-bold tracking-tight">LoanFlow AI</span>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
+              <Zap className="h-4.5 w-4.5 text-white" />
+            </div>
+            <span className="text-lg font-bold tracking-tight">
+              LoanFlow AI
+            </span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-8 text-sm text-slate-300">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-slate-400">
+            {NAV_LINKS.map(({ label, href }) => (
+              <a
+                key={href}
+                href={href}
+                className="hover:text-white transition-colors duration-200"
+              >
+                {label}
+              </a>
+            ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            <a href="#hero" className="text-sm text-slate-300 hover:text-white transition-colors">Sign in</a>
+          <div className="hidden md:flex items-center gap-4">
+            <a
+              href="#hero"
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Sign in
+            </a>
             <a href="#hero">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white">
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow-lg shadow-blue-600/25 transition-all duration-200 hover:shadow-blue-500/40"
+              >
                 Start Free Trial
               </Button>
             </a>
           </div>
 
-          {/* Mobile menu toggle */}
-          <button className="md:hidden text-slate-300" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          <button
+            className="md:hidden text-slate-400 hover:text-white transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-800 px-4 py-4 space-y-3 text-sm text-slate-300">
-            <a href="#features" className="block hover:text-white" onClick={() => setMobileMenuOpen(false)}>Features</a>
-            <a href="#how-it-works" className="block hover:text-white" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
-            <a href="#pricing" className="block hover:text-white" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-            <a href="#hero" className="block hover:text-white" onClick={() => setMobileMenuOpen(false)}>Sign In / Sign Up</a>
+          <div className="md:hidden bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-white/5 px-4 py-5 space-y-4 text-sm">
+            {NAV_LINKS.map(({ label, href }) => (
+              <a
+                key={href}
+                href={href}
+                className="block text-slate-300 hover:text-white transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {label}
+              </a>
+            ))}
+            <a
+              href="#hero"
+              className="block text-slate-300 hover:text-white transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Sign In / Sign Up
+            </a>
           </div>
         )}
       </header>
 
-      {/* HERO */}
-      <section id="hero" className="bg-slate-950 text-white pt-20 pb-28 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left: copy */}
+      {/* ─── HERO ─── */}
+      <section
+        id="hero"
+        className="relative pt-32 pb-24 lg:pb-32 px-4 sm:px-6 overflow-hidden"
+      >
+        {/* Background gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-20 right-1/4 w-[400px] h-[400px] bg-violet-600/8 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+        <div className="relative max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+          {/* Left */}
           <div className="space-y-8">
-            <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30 text-sm px-3 py-1">
+            <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 text-sm text-blue-400">
+              <Sparkles className="h-3.5 w-3.5" />
               Built for Independent Mortgage Brokers
-            </Badge>
-            <h1 className="text-5xl sm:text-6xl font-bold leading-tight tracking-tight">
-              Your virtual loan processor,{" "}
-              <span className="text-blue-400">working 24/7.</span>
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl lg:text-[4.25rem] font-bold leading-[1.1] tracking-tight">
+              Your AI{" "}
+              <span className="bg-gradient-to-r from-blue-400 via-blue-300 to-violet-400 bg-clip-text text-transparent">
+                Loan Processor
+              </span>
             </h1>
-            <p className="text-slate-400 text-xl leading-relaxed max-w-xl">
-              AI-powered loan origination, AUS simulation, pricing engine, and borrower portal — everything ARIVE offers, reimagined with AI at the core.
+
+            <p className="text-slate-400 text-xl leading-relaxed max-w-lg">
+              Independent mortgage officers close faster with AI&#8209;powered
+              file completion, AUS simulation, and automated compliance — from
+              first quote to clear&#8209;to&#8209;close.
             </p>
 
             <div className="space-y-3">
               {[
-                "Rate quotes across all loan programs in seconds",
-                "1003 application, AUS, Loan Estimate in one workflow",
-                "AI classifies & extracts data from every document",
-                "Borrower portal — no login needed for clients",
+                "AI classifies and extracts data from every document",
+                "Auto-generated checklists and borrower portal",
+                "AUS simulation, Loan Estimates, lender submission",
+                "Zero compliance gaps — every step is tracked",
               ].map((item) => (
-                <div key={item} className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle className="h-5 w-5 text-blue-400 shrink-0" />
+                <div
+                  key={item}
+                  className="flex items-start gap-3 text-slate-300 text-[15px]"
+                >
+                  <CheckCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
                   <span>{item}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-4 text-sm text-slate-500 pt-2">
-              <div className="flex items-center gap-1.5">
-                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+            <div className="flex flex-wrap gap-6 text-sm text-slate-500 pt-2">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
                 <span>14-day free trial</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle className="h-4 w-4 text-green-400" />
-                <span>No credit card required</span>
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-slate-500" />
+                <span>No credit card</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Shield className="h-4 w-4 text-blue-400" />
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-slate-500" />
                 <span>SOC 2 compliant</span>
               </div>
             </div>
@@ -337,240 +699,382 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* STATS BAR */}
-      <section className="bg-blue-600 text-white py-10 px-4">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+      {/* ─── STATS BAR ─── */}
+      <section className="relative border-y border-white/5 bg-white/[0.02]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 sm:grid-cols-4 gap-8">
           {STATS.map(({ value, label }) => (
-            <div key={label}>
-              <div className="text-4xl font-bold">{value}</div>
-              <div className="text-blue-200 text-sm mt-1">{label}</div>
+            <div key={label} className="text-center">
+              <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent">
+                {value}
+              </div>
+              <div className="text-slate-500 text-sm mt-1.5">{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section id="features" className="py-24 px-4 sm:px-6 bg-slate-50">
-        <div className="max-w-7xl mx-auto space-y-14">
-          <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <Badge variant="outline" className="text-blue-600 border-blue-200">Platform Features</Badge>
-            <h2 className="text-4xl font-bold tracking-tight">Everything you need to originate faster</h2>
-            <p className="text-slate-500 text-lg">From first rate quote to lender submission — all in one AI-powered platform.</p>
+      {/* ─── FEATURES ─── */}
+      <section id="features" className="py-24 lg:py-32 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto space-y-24">
+          <div className="text-center space-y-4 max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-sm text-slate-400">
+              Platform Features
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight">
+              Everything you need to originate faster
+            </h2>
+            <p className="text-slate-400 text-lg">
+              From first rate quote to lender submission — all in one
+              AI-powered platform.
+            </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {FEATURES.map(({ icon: Icon, title, description, color }) => (
-              <div key={title} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow space-y-4">
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">{title}</h3>
-                  <p className="text-slate-500 text-sm mt-1 leading-relaxed">{description}</p>
+          {FEATURE_GROUPS.map((group, i) => (
+            <div
+              key={group.tag}
+              className={`grid lg:grid-cols-2 gap-12 lg:gap-16 items-center ${
+                i % 2 === 1 ? "lg:grid-flow-dense" : ""
+              }`}
+            >
+              <div
+                className={`space-y-6 ${i % 2 === 1 ? "lg:col-start-2" : ""}`}
+              >
+                <span
+                  className={`text-sm font-semibold uppercase tracking-wider ${group.tagColor}`}
+                >
+                  {group.tag}
+                </span>
+                <h3 className="text-3xl sm:text-4xl font-bold leading-tight">
+                  {group.title}
+                </h3>
+                <p className="text-slate-400 text-lg leading-relaxed">
+                  {group.description}
+                </p>
+                <div className="space-y-4 pt-2">
+                  {group.features.map(({ icon: Icon, text }) => (
+                    <div
+                      key={text}
+                      className="flex items-center gap-3.5 text-slate-300"
+                    >
+                      <div className="h-9 w-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <Icon className="h-4 w-4 text-slate-300" />
+                      </div>
+                      <span className="text-[15px]">{text}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
+              <div className={i % 2 === 1 ? "lg:col-start-1" : ""}>
+                <FeatureVisual type={group.visual} />
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section id="how-it-works" className="py-24 px-4 sm:px-6 bg-white">
-        <div className="max-w-5xl mx-auto space-y-14">
-          <div className="text-center space-y-3">
-            <Badge variant="outline" className="text-blue-600 border-blue-200">How It Works</Badge>
-            <h2 className="text-4xl font-bold tracking-tight">Go from intake to close in record time</h2>
+      {/* ─── HOW IT WORKS ─── */}
+      <section
+        id="how-it-works"
+        className="py-24 lg:py-32 px-4 sm:px-6 relative"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-600/[0.03] to-transparent pointer-events-none" />
+
+        <div className="relative max-w-5xl mx-auto space-y-16">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-sm text-slate-400">
+              How It Works
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight">
+              Go from intake to close in record time
+            </h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {STEPS.map(({ step, title, description }, i) => (
-              <div key={step} className="relative space-y-4">
+            {STEPS.map(({ num, title, description }, i) => (
+              <div key={num} className="relative group">
+                {/* Connector line */}
                 {i < STEPS.length - 1 && (
-                  <div className="hidden md:block absolute top-6 left-[calc(100%-1rem)] w-full h-0.5 bg-blue-100 z-0" />
+                  <div className="hidden md:block absolute top-7 left-[calc(50%+2rem)] w-[calc(100%-4rem)] h-px bg-gradient-to-r from-blue-500/30 to-blue-500/5" />
                 )}
-                <div className="relative z-10 h-12 w-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                  {step}
+                <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-8 space-y-5 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300">
+                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 text-white flex items-center justify-center font-bold text-sm shadow-lg shadow-blue-600/20">
+                    {num}
+                  </div>
+                  <h3 className="font-bold text-xl">{title}</h3>
+                  <p className="text-slate-400 text-[15px] leading-relaxed">
+                    {description}
+                  </p>
                 </div>
-                <h3 className="font-bold text-lg">{title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* FEATURE HIGHLIGHT — AI */}
-      <section className="py-24 px-4 sm:px-6 bg-slate-950 text-white">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-          <div className="space-y-6">
-            <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30">AI-Powered</Badge>
-            <h2 className="text-4xl font-bold leading-tight">
-              AUS that thinks like an underwriter.
+      {/* ─── SOCIAL PROOF ─── */}
+      <section className="py-24 px-4 sm:px-6 border-y border-white/5">
+        <div className="max-w-7xl mx-auto space-y-14">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              Trusted by loan officers nationwide
             </h2>
-            <p className="text-slate-400 text-lg leading-relaxed">
-              Our AI AUS simulation analyzes LTV, DTI, credit score, and loan characteristics to produce DU/LP-style recommendations — with findings, conditions, and risk levels — before you ever submit to a lender.
+            <p className="text-slate-400 text-lg">
+              Hear from brokers who are closing more loans with less effort.
             </p>
-            <div className="space-y-3">
-              {[
-                "APPROVE/ELIGIBLE, REFER, or REFER WITH CAUTION",
-                "Detailed findings by category",
-                "Auto-generated underwriting conditions",
-                "Confidence score on every result",
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-3 text-slate-300 text-sm">
-                  <CheckCircle className="h-4 w-4 text-blue-400 shrink-0" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-            <a href="#hero">
-              <Button className="bg-blue-600 hover:bg-blue-500 gap-2 mt-2">
-                Try It Free <ArrowRight className="h-4 w-4" />
-              </Button>
-            </a>
-          </div>
-
-          <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400 text-sm">AUS Result</span>
-              <Badge className="bg-green-600 text-white">APPROVE / ELIGIBLE</Badge>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[["LTV", "80%"], ["DTI", "38%"], ["Credit", "740"]].map(([label, value]) => (
-                <div key={label} className="bg-slate-800 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">{label}</p>
-                  <p className="text-white font-bold text-lg">{value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2">
-              {[
-                { label: "Credit Score", finding: "Score meets guidelines", ok: true },
-                { label: "LTV", finding: "LTV within conventional limits", ok: true },
-                { label: "DTI", finding: "Back-end DTI within guidelines", ok: true },
-                { label: "Reserves", finding: "3 months reserves provided", ok: true },
-              ].map(({ label, finding, ok }) => (
-                <div key={label} className="flex items-center gap-3 text-sm">
-                  <CheckCircle className={`h-4 w-4 shrink-0 ${ok ? "text-green-400" : "text-red-400"}`} />
-                  <span className="text-slate-300">{finding}</span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-slate-800 pt-3 text-xs text-slate-500">
-              AI simulation · Not a commitment to lend
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section id="pricing" className="py-24 px-4 sm:px-6 bg-white">
-        <div className="max-w-5xl mx-auto space-y-14">
-          <div className="text-center space-y-3">
-            <Badge variant="outline" className="text-blue-600 border-blue-200">Pricing</Badge>
-            <h2 className="text-4xl font-bold tracking-tight">Simple, transparent pricing</h2>
-            <p className="text-slate-500 text-lg">Start free for 14 days. No credit card required.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {PLANS.map(({ name, price, period, description, features, cta, highlighted }) => (
+            {TESTIMONIALS.map(({ quote, name, role }) => (
               <div
                 key={name}
-                className={`rounded-2xl p-8 space-y-6 border-2 ${highlighted ? "border-blue-600 bg-blue-600 text-white shadow-xl scale-[1.02]" : "border-slate-200 bg-white"}`}
+                className="bg-white/[0.03] border border-white/5 rounded-2xl p-8 space-y-6 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300"
               >
-                {highlighted && (
-                  <Badge className="bg-white text-blue-600 text-xs">Most Popular</Badge>
-                )}
-                <div>
-                  <h3 className={`text-lg font-bold ${highlighted ? "text-white" : "text-slate-900"}`}>{name}</h3>
-                  <p className={`text-sm mt-1 ${highlighted ? "text-blue-200" : "text-slate-500"}`}>{description}</p>
-                </div>
-                <div className="flex items-end gap-1">
-                  <span className={`text-4xl font-bold ${highlighted ? "text-white" : "text-slate-900"}`}>{price}</span>
-                  <span className={`text-sm mb-1 ${highlighted ? "text-blue-200" : "text-slate-500"}`}>{period}</span>
-                </div>
-                <ul className="space-y-2">
-                  {features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className={`h-4 w-4 shrink-0 ${highlighted ? "text-blue-200" : "text-blue-600"}`} />
-                      <span className={highlighted ? "text-blue-100" : "text-slate-600"}>{f}</span>
-                    </li>
+                {/* Stars */}
+                <div className="flex gap-1">
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <Star
+                      key={j}
+                      className="h-4 w-4 text-amber-400 fill-amber-400"
+                    />
                   ))}
-                </ul>
-                <a href="#hero">
-                  <Button
-                    className={`w-full ${highlighted ? "bg-white text-blue-600 hover:bg-blue-50" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
-                  >
-                    {cta}
-                  </Button>
-                </a>
+                </div>
+                <p className="text-slate-300 text-[15px] leading-relaxed">
+                  &ldquo;{quote}&rdquo;
+                </p>
+                <div>
+                  <p className="text-white font-semibold text-sm">{name}</p>
+                  <p className="text-slate-500 text-sm">{role}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="py-24 px-4 sm:px-6 bg-blue-600 text-white text-center">
-        <div className="max-w-2xl mx-auto space-y-6">
-          <h2 className="text-4xl font-bold">Ready to close more loans, faster?</h2>
-          <p className="text-blue-200 text-lg">Join loan officers using LoanFlow AI to automate their pipeline — from first quote to clear to close.</p>
-          <a href="#hero">
-            <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold gap-2 px-8">
-              Start Your Free Trial <ArrowRight className="h-5 w-5" />
-            </Button>
-          </a>
-          <p className="text-blue-300 text-sm">14 days free · No credit card · Cancel anytime</p>
+      {/* ─── PRICING ─── */}
+      <section id="pricing" className="py-24 lg:py-32 px-4 sm:px-6 relative">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="relative max-w-5xl mx-auto space-y-16">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-sm text-slate-400">
+              Pricing
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight">
+              Simple, transparent pricing
+            </h2>
+            <p className="text-slate-400 text-lg">
+              Start free for 14 days. No credit card required. Cancel anytime.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+            {PLANS.map(
+              ({ name, price, period, description, features, cta, highlighted }) => (
+                <div
+                  key={name}
+                  className={`relative rounded-2xl p-8 space-y-6 transition-all duration-300 hover:-translate-y-1 ${
+                    highlighted
+                      ? "bg-gradient-to-b from-blue-600 to-blue-700 shadow-2xl shadow-blue-600/20 border-2 border-blue-500/50 scale-[1.02]"
+                      : "bg-white/[0.03] border border-white/10 hover:border-white/15"
+                  }`}
+                >
+                  {highlighted && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                      <span className="bg-white text-blue-700 text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3
+                      className={`text-lg font-bold ${
+                        highlighted ? "text-white" : "text-white"
+                      }`}
+                    >
+                      {name}
+                    </h3>
+                    <p
+                      className={`text-sm mt-1 ${
+                        highlighted ? "text-blue-200" : "text-slate-400"
+                      }`}
+                    >
+                      {description}
+                    </p>
+                  </div>
+
+                  <div className="flex items-end gap-1">
+                    <span className="text-5xl font-bold text-white">
+                      {price}
+                    </span>
+                    <span
+                      className={`text-sm mb-1.5 ${
+                        highlighted ? "text-blue-200" : "text-slate-500"
+                      }`}
+                    >
+                      {period}
+                    </span>
+                  </div>
+
+                  <ul className="space-y-3">
+                    {features.map((f) => (
+                      <li key={f} className="flex items-center gap-2.5 text-sm">
+                        <CheckCircle
+                          className={`h-4 w-4 shrink-0 ${
+                            highlighted ? "text-blue-200" : "text-blue-400"
+                          }`}
+                        />
+                        <span
+                          className={
+                            highlighted ? "text-blue-100" : "text-slate-300"
+                          }
+                        >
+                          {f}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <a href="#hero" className="block">
+                    <Button
+                      className={`w-full h-11 rounded-xl font-semibold transition-all duration-200 ${
+                        highlighted
+                          ? "bg-white text-blue-700 hover:bg-blue-50 shadow-lg"
+                          : "bg-white/10 text-white hover:bg-white/15 border border-white/10"
+                      }`}
+                    >
+                      {cta}
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </a>
+                </div>
+              )
+            )}
+          </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-slate-950 text-slate-400 py-12 px-4 sm:px-6">
+      {/* ─── FINAL CTA ─── */}
+      <section className="py-24 lg:py-32 px-4 sm:px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-600/10 via-blue-600/5 to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
+
+        <div className="relative max-w-2xl mx-auto text-center space-y-8">
+          <h2 className="text-4xl sm:text-5xl font-bold tracking-tight">
+            Ready to close more loans,{" "}
+            <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">
+              faster?
+            </span>
+          </h2>
+          <p className="text-slate-400 text-lg leading-relaxed">
+            Join loan officers using LoanFlow AI to automate their pipeline —
+            from first quote to clear to close.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="#hero">
+              <Button
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold gap-2 px-8 h-12 rounded-xl shadow-lg shadow-blue-600/25 transition-all duration-200 hover:shadow-blue-500/40"
+              >
+                Start Your Free Trial
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </a>
+          </div>
+          <p className="text-slate-500 text-sm">
+            14 days free &middot; No credit card &middot; Cancel anytime
+          </p>
+        </div>
+      </section>
+
+      {/* ─── FOOTER ─── */}
+      <footer className="border-t border-white/5 bg-[#07070b] py-14 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid sm:grid-cols-4 gap-8 pb-10 border-b border-slate-800">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Zap className="h-6 w-6 text-blue-400" />
+          <div className="grid sm:grid-cols-4 gap-10 pb-12 border-b border-white/5">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-7 w-7 rounded-md bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+                  <Zap className="h-3.5 w-3.5 text-white" />
+                </div>
                 <span className="text-white font-bold">LoanFlow AI</span>
               </div>
-              <p className="text-sm leading-relaxed">
-                AI-powered loan origination platform for independent mortgage brokers.
+              <p className="text-slate-500 text-sm leading-relaxed">
+                AI-powered loan origination for independent mortgage brokers.
               </p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="text-white text-sm font-semibold">Product</h4>
-              <div className="space-y-2 text-sm">
-                <a href="#features" className="block hover:text-white transition-colors">Features</a>
-                <a href="#pricing" className="block hover:text-white transition-colors">Pricing</a>
-                <a href="#how-it-works" className="block hover:text-white transition-colors">How It Works</a>
+              <div className="space-y-2.5 text-sm text-slate-500">
+                <a
+                  href="#features"
+                  className="block hover:text-white transition-colors"
+                >
+                  Features
+                </a>
+                <a
+                  href="#pricing"
+                  className="block hover:text-white transition-colors"
+                >
+                  Pricing
+                </a>
+                <a
+                  href="#how-it-works"
+                  className="block hover:text-white transition-colors"
+                >
+                  How It Works
+                </a>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="text-white text-sm font-semibold">Platform</h4>
-              <div className="space-y-2 text-sm">
-                <span className="block">Pricing Engine</span>
+              <div className="space-y-2.5 text-sm text-slate-500">
+                <span className="block">Document AI</span>
                 <span className="block">AUS Simulation</span>
-                <span className="block">Loan Estimate</span>
+                <span className="block">Loan Estimates</span>
                 <span className="block">Borrower Portal</span>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="text-white text-sm font-semibold">Get Started</h4>
-              <div className="space-y-2 text-sm">
-                <a href="#hero" className="block hover:text-white transition-colors">Start Free Trial</a>
-                <a href="#hero" className="block hover:text-white transition-colors">Sign In</a>
+              <div className="space-y-2.5 text-sm text-slate-500">
+                <a
+                  href="#hero"
+                  className="block hover:text-white transition-colors"
+                >
+                  Start Free Trial
+                </a>
+                <a
+                  href="#hero"
+                  className="block hover:text-white transition-colors"
+                >
+                  Sign In
+                </a>
               </div>
             </div>
           </div>
 
-          <div className="pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
-            <p>© {new Date().getFullYear()} LoanFlow AI. All rights reserved.</p>
+          <div className="pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-slate-600">
+            <p>
+              &copy; {new Date().getFullYear()} LoanFlow AI. All rights
+              reserved.
+            </p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+              <a
+                href="#"
+                className="hover:text-white transition-colors"
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="#"
+                className="hover:text-white transition-colors"
+              >
+                Terms of Service
+              </a>
             </div>
           </div>
         </div>

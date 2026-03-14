@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
+import { parseBody, createLoanSchema } from "@/lib/validation/api-schemas";
 
 export async function GET() {
   const supabase = await createClient();
@@ -22,10 +23,15 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
 
-  const body = await request.json();
+  const rawBody = await request.json();
+  const parsed = parseBody(createLoanSchema, rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(errorResponse(parsed.error), { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from("loan_files")
-    .insert({ ...body, user_id: user.id })
+    .insert({ ...parsed.data, user_id: user.id })
     .select()
     .single();
 
