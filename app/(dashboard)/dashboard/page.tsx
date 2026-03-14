@@ -14,7 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { daysUntil } from "@/lib/utils/date-utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Plus, FileText, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Minus, DollarSign } from "lucide-react";
+import { Plus, FileText, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Minus, DollarSign, ShieldAlert, Clock, FileWarning, FolderCheck } from "lucide-react";
+import { useOpenEscalationCount } from "@/hooks/useEscalations";
 
 interface MarketRates {
   configured: boolean;
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   const { data: loans, isLoading: loansLoading } = useLoans();
   const { data: pulseEvents } = usePulseEvents();
   const updatePulse = useUpdatePulseEvent();
+  const { data: escalationCount } = useOpenEscalationCount();
   const [marketRates, setMarketRates] = useState<MarketRates | null>(null);
 
   useEffect(() => {
@@ -93,12 +95,34 @@ export default function DashboardPage() {
   const pipelineValue = activeLoans.reduce((sum, l) => sum + (l.loan_amount ?? 0), 0);
   const volumeThisMonth = closedThisMonth.reduce((sum, l) => sum + (l.loan_amount ?? 0), 0);
 
+  // File completion engine metrics
+  const filesNeedingAttention = loans?.filter((l) =>
+    l.doc_workflow_state === "corrections_needed" || l.doc_workflow_state === "officer_review_needed"
+  ).length ?? 0;
+
+  const fileCompleteLoans = loans?.filter((l) => l.doc_workflow_state === "file_complete").length ?? 0;
+  const loansWithWorkflow = loans?.filter((l) => l.doc_workflow_state !== null).length ?? 0;
+  const fileCompletionRate = loansWithWorkflow > 0
+    ? Math.round((fileCompleteLoans / loansWithWorkflow) * 100)
+    : 0;
+
+  const docsPending = loans?.filter((l) =>
+    l.doc_workflow_state === "awaiting_documents" || l.doc_workflow_state === "checklist_pending"
+  ).length ?? 0;
+
   const stats = [
     { label: "Active Loans", value: activeLoans.length, display: String(activeLoans.length), icon: FileText, color: "text-blue-600" },
     { label: "Pipeline Value", value: pipelineValue, display: formatMoney(pipelineValue), icon: DollarSign, color: "text-blue-600" },
     { label: "Closed This Month", value: closedThisMonth.length, display: `${closedThisMonth.length} (${formatMoney(volumeThisMonth)})`, icon: CheckCircle, color: "text-green-600" },
     { label: "Deadlines This Week", value: upcomingDeadlines.filter((d) => (daysUntil(d.date) ?? 99) <= 7).length, display: String(upcomingDeadlines.filter((d) => (daysUntil(d.date) ?? 99) <= 7).length), icon: AlertTriangle, color: "text-orange-600" },
     { label: "Pulse Opportunities", value: pulseEvents?.length ?? 0, display: String(pulseEvents?.length ?? 0), icon: TrendingUp, color: "text-purple-600" },
+  ];
+
+  const fileCompletionStats = [
+    { label: "Files Needing Attention", value: filesNeedingAttention, display: String(filesNeedingAttention), icon: FileWarning, color: "text-orange-600" },
+    { label: "Open Escalations", value: escalationCount ?? 0, display: String(escalationCount ?? 0), icon: ShieldAlert, color: "text-red-600" },
+    { label: "Documents Pending", value: docsPending, display: String(docsPending), icon: Clock, color: "text-amber-600" },
+    { label: "File Completion Rate", value: fileCompletionRate, display: `${fileCompletionRate}%`, icon: FolderCheck, color: "text-green-600" },
   ];
 
   return (
@@ -120,6 +144,24 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Card key={stat.label}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Icon className={`h-7 w-7 ${stat.color}`} />
+                <div>
+                  <p className="text-xl font-bold leading-tight">{stat.display}</p>
+                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* File Completion KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {fileCompletionStats.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.label}>

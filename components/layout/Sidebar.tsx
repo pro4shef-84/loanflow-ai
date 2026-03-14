@@ -14,16 +14,19 @@ import {
   Zap,
   Calculator,
   BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 // FileText imported above
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app.store";
+import { useOpenEscalationCount } from "@/hooks/useEscalations";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/loans", label: "Loan Files", icon: FileText },
+  { href: "/escalations", label: "Escalations", icon: AlertTriangle, showBadge: true },
   { href: "/pricing", label: "Pricing Engine", icon: Calculator },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pulse", label: "Pulse", icon: Activity },
@@ -40,6 +43,7 @@ const settingsItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useAppStore();
+  const { data: escalationCount } = useOpenEscalationCount();
 
   return (
     <aside
@@ -74,6 +78,7 @@ export function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
+          const badgeCount = item.showBadge ? escalationCount : undefined;
           return (
             <Link
               key={item.href}
@@ -86,7 +91,15 @@ export function Sidebar() {
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {sidebarOpen && <span>{item.label}</span>}
+              {sidebarOpen && <span className="flex-1">{item.label}</span>}
+              {sidebarOpen && badgeCount !== undefined && badgeCount > 0 && (
+                <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full text-xs font-bold bg-red-500 text-white">
+                  {badgeCount}
+                </span>
+              )}
+              {!sidebarOpen && badgeCount !== undefined && badgeCount > 0 && (
+                <span className="absolute right-1 top-0 inline-flex h-2 w-2 rounded-full bg-red-500" />
+              )}
             </Link>
           );
         })}

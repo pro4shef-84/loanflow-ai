@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { PortalChecklist } from "@/components/portal/PortalChecklist";
-import { PortalUploader } from "@/components/portal/PortalUploader";
+import { PortalFileCompletion } from "@/components/portal/PortalFileCompletion";
 import { Progress } from "@/components/ui/progress";
 import { Zap, CheckCircle } from "lucide-react";
 import type { LoanType, DocumentType } from "@/lib/types/loan.types";
 import type { Database } from "@/lib/types/database.types";
 
 type Document = Database["public"]["Tables"]["documents"]["Row"];
+type RequirementRow = Database["public"]["Tables"]["document_requirements"]["Row"];
 
 interface PortalPageProps {
   params: Promise<{ token: string }>;
@@ -18,11 +19,14 @@ export default async function PortalPage({ params }: PortalPageProps) {
 
   const { data: loan } = await supabase
     .from("loan_files")
-    .select("*, documents(*)")
+    .select("*, documents(*), document_requirements(*)")
     .eq("portal_token", token)
     .single();
 
-  type LoanRow = Database["public"]["Tables"]["loan_files"]["Row"] & { documents: Document[] };
+  type LoanRow = Database["public"]["Tables"]["loan_files"]["Row"] & {
+    documents: Document[];
+    document_requirements: RequirementRow[];
+  };
   const loanData = loan as unknown as LoanRow | null;
 
   if (!loanData) {
@@ -49,6 +53,10 @@ export default async function PortalPage({ params }: PortalPageProps) {
   }
 
   const documents = (loanData.documents ?? []) as Document[];
+  const requirements = (loanData.document_requirements ?? []) as RequirementRow[];
+  const hasFileCompletionChecklist = requirements.length > 0;
+
+  // Legacy progress for when no file completion checklist exists
   const uploaded = documents.filter((d) => d.status !== "pending").length;
   const total = documents.length;
   const progress = total > 0 ? (uploaded / total) * 100 : 0;
@@ -66,36 +74,59 @@ export default async function PortalPage({ params }: PortalPageProps) {
       <main className="max-w-lg mx-auto px-4 py-8 space-y-8 pb-16">
         {/* Welcome */}
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Hello! 👋</h1>
+          <h1 className="text-2xl font-bold">Hello!</h1>
           <p className="text-muted-foreground">
             Your loan officer needs a few documents to process your loan. This is secure and takes just a few minutes.
           </p>
         </div>
 
-        {/* Progress */}
-        <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
-          <div className="text-center">
-            {progress === 100 ? (
-              <div className="flex flex-col items-center gap-2 text-green-600">
-                <CheckCircle className="h-10 w-10" />
-                <p className="font-semibold text-lg">All documents submitted!</p>
-                <p className="text-sm text-muted-foreground">Your loan officer will review them shortly.</p>
+        {hasFileCompletionChecklist ? (
+          /* Enhanced File Completion Checklist */
+          <PortalFileCompletion
+            loanToken={token}
+            requirements={requirements.map((r) => ({
+              id: r.id,
+              doc_type: r.doc_type,
+              state: r.state,
+              notes: r.notes,
+            }))}
+            documents={documents.map((d) => ({
+              id: d.id,
+              type: d.type,
+              status: d.status,
+              original_filename: d.original_filename,
+              confidence_score: d.confidence_score,
+              issues: Array.isArray(d.issues) ? (d.issues as string[]) : null,
+              requirement_id: d.requirement_id,
+            }))}
+          />
+        ) : (
+          /* Legacy Checklist */
+          <>
+            <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+              <div className="text-center">
+                {progress === 100 ? (
+                  <div className="flex flex-col items-center gap-2 text-green-600">
+                    <CheckCircle className="h-10 w-10" />
+                    <p className="font-semibold text-lg">All documents submitted!</p>
+                    <p className="text-sm text-muted-foreground">Your loan officer will review them shortly.</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-3xl font-bold">{uploaded} of {total}</p>
+                    <p className="text-muted-foreground">documents submitted</p>
+                  </>
+                )}
               </div>
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{uploaded} of {total}</p>
-                <p className="text-muted-foreground">documents submitted</p>
-              </>
-            )}
-          </div>
-          <Progress value={progress} className="h-3" />
-        </div>
+              <Progress value={progress} className="h-3" />
+            </div>
 
-        {/* Checklist */}
-        <PortalChecklist
-          loanType={loanData.loan_type as LoanType}
-          documents={documents}
-        />
+            <PortalChecklist
+              loanType={loanData.loan_type as LoanType}
+              documents={documents}
+            />
+          </>
+        )}
       </main>
     </div>
   );

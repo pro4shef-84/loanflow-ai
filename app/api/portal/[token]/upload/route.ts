@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import type { Database } from "@/lib/types/database.types";
 import { anthropic, MODELS } from "@/lib/anthropic/client";
@@ -10,59 +10,62 @@ import { CONFIDENCE_THRESHOLD, type RequiredDocType } from "@/lib/domain/enums";
 import type { ExtractedFields } from "@/lib/domain/rules/documentValidationRules";
 import type { Json } from "@/lib/types/database.types";
 
+type Params = { params: Promise<{ token: string }> };
+type LoanFileRow = Database["public"]["Tables"]["loan_files"]["Row"];
 type DocumentType = Database["public"]["Tables"]["documents"]["Row"]["type"];
 type DocRow = Database["public"]["Tables"]["documents"]["Row"];
 
-export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
+export async function POST(request: NextRequest, { params }: Params) {
+  const { token } = await params;
+  const supabase = await createServiceClient();
+
+  // Verify portal token
+  const { data: loanData } = await supabase
+    .from("loan_files")
+    .select("id, user_id, portal_expires_at")
+    .eq("portal_token", token)
+    .single();
+
+  if (!loanData) return NextResponse.json(errorResponse("Invalid portal link"), { status: 404 });
+
+  const loan = loanData as Pick<LoanFileRow, "id" | "user_id" | "portal_expires_at">;
+
+  if (loan.portal_expires_at && new Date(loan.portal_expires_at) < new Date()) {
+    return NextResponse.json(errorResponse("Portal link expired"), { status: 410 });
+  }
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
-  const loanFileId = formData.get("loanFileId") as string;
   const documentType = formData.get("documentType") as string | null;
   const requirementId = formData.get("requirementId") as string | null;
 
-  if (!file || !loanFileId) {
-    return NextResponse.json(errorResponse("Missing file or loanFileId"), { status: 400 });
-  }
+  if (!file) return NextResponse.json(errorResponse("No file provided"), { status: 400 });
 
-  // Verify ownership
-  const { data: loan } = await supabase
-    .from("loan_files")
-    .select("id")
-    .eq("id", loanFileId)
-    .eq("user_id", user.id)
-    .single();
-  if (!loan) return NextResponse.json(errorResponse("Loan not found"), { status: 404 });
-
-  // Upload file to Supabase Storage
-  const serviceClient = await createServiceClient();
+  // Upload to storage
   const ext = file.name.split(".").pop() ?? "bin";
-  const path = `${user.id}/${loanFileId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const path = `portal/${loan.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   const buffer = await file.arrayBuffer();
-  const { error: uploadError } = await serviceClient.storage
+  const { error: uploadError } = await supabase.storage
     .from("loan-documents")
     .upload(path, buffer, { contentType: file.type });
 
-  if (uploadError) {
-    return NextResponse.json(errorResponse(uploadError.message), { status: 500 });
-  }
+  if (uploadError) return NextResponse.json(errorResponse(uploadError.message), { status: 500 });
 
-  // Create document record
-  const { data: existingDoc } = await supabase
+  // Find existing pending document or create new
+  const { data: existing } = await supabase
     .from("documents")
     .select("id")
-    .eq("loan_file_id", loanFileId)
+    .eq("loan_file_id", loan.id)
     .eq("type", (documentType ?? "other") as DocumentType)
     .eq("status", "pending")
     .single();
 
+  const existingDoc = existing as { id: string } | null;
   let doc: DocRow | null = null;
+
   if (existingDoc) {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("documents")
       .update({
         status: "processing",
@@ -76,13 +79,12 @@ export async function POST(request: NextRequest) {
       .eq("id", existingDoc.id)
       .select()
       .single();
-    if (error) return NextResponse.json(errorResponse(error.message), { status: 500 });
     doc = data as DocRow;
   } else {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("documents")
       .insert({
-        loan_file_id: loanFileId,
+        loan_file_id: loan.id,
         type: (documentType ?? "other") as DocumentType,
         status: "processing",
         file_path: path,
@@ -95,22 +97,22 @@ export async function POST(request: NextRequest) {
       })
       .select()
       .single();
-    if (error) return NextResponse.json(errorResponse(error.message), { status: 500 });
     doc = data as DocRow;
   }
+
   if (!doc) return NextResponse.json(errorResponse("Document creation failed"), { status: 500 });
 
   // Log upload event
   await supabase.from("file_completion_events").insert({
-    loan_file_id: loanFileId,
+    loan_file_id: loan.id,
     event_type: "document_uploaded",
-    actor: "officer",
+    actor: "borrower",
     payload: { document_id: doc.id, filename: file.name, document_type: documentType },
   });
 
-  // --- AI Classification Pipeline ---
+  // --- AI Classification Pipeline (same as officer upload) ---
   try {
-    // Step 1: Classify document via Claude
+    // Step 1: Classify
     const classifyPrompt = buildClassifyPrompt(file.name);
     const classifyResponse = await anthropic.messages.create({
       model: MODELS.haiku,
@@ -135,10 +137,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Track classification token usage
+    // Track token usage
     await supabase.from("token_usage").insert({
-      user_id: user.id,
-      loan_file_id: loanFileId,
+      user_id: loan.user_id,
+      loan_file_id: loan.id,
       module: "classify-document",
       model: MODELS.haiku,
       input_tokens: classifyResponse.usage.input_tokens,
@@ -148,15 +150,14 @@ export async function POST(request: NextRequest) {
         (classifyResponse.usage.output_tokens / 1_000_000) * 4.0,
     });
 
-    // Log classification event
     await supabase.from("file_completion_events").insert({
-      loan_file_id: loanFileId,
+      loan_file_id: loan.id,
       event_type: "document_classified",
       actor: "system",
       payload: { document_id: doc.id, classified_type: classifiedType, confidence: confidenceScore },
     });
 
-    // Step 2: Extract fields for validation
+    // Step 2: Extract fields
     const extractPrompt = buildExtractDocumentPrompt(classifiedType, `Filename: ${file.name}`);
     const extractResponse = await anthropic.messages.create({
       model: MODELS.haiku,
@@ -173,10 +174,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Track extraction token usage
     await supabase.from("token_usage").insert({
-      user_id: user.id,
-      loan_file_id: loanFileId,
+      user_id: loan.user_id,
+      loan_file_id: loan.id,
       module: "extract-document",
       model: MODELS.haiku,
       input_tokens: extractResponse.usage.input_tokens,
@@ -186,12 +186,11 @@ export async function POST(request: NextRequest) {
         (extractResponse.usage.output_tokens / 1_000_000) * 4.0,
     });
 
-    // Step 3: Run deterministic validation
+    // Step 3: Deterministic validation
     const validationResult = validateDocument(classifiedType as RequiredDocType, extractedFields);
 
-    // Log validation event
     await supabase.from("file_completion_events").insert({
-      loan_file_id: loanFileId,
+      loan_file_id: loan.id,
       event_type: "document_validated",
       actor: "system",
       payload: {
@@ -202,7 +201,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Step 4: Update document record with classification + validation results
+    // Step 4: Update document
     const newDocStatus = validationResult.valid ? "verified" : "needs_attention";
     await supabase
       .from("documents")
@@ -233,34 +232,34 @@ export async function POST(request: NextRequest) {
         .eq("id", targetRequirementId);
 
       await supabase.from("file_completion_events").insert({
-        loan_file_id: loanFileId,
+        loan_file_id: loan.id,
         event_type: "requirement_state_changed",
         actor: "system",
         payload: { requirement_id: targetRequirementId, new_state: reqState, document_id: doc.id },
       });
     }
 
-    // Step 6: Create escalation if confidence < threshold
+    // Step 6: Escalate if low confidence
     if (confidenceScore < CONFIDENCE_THRESHOLD) {
       await supabase.from("escalations").insert({
-        loan_file_id: loanFileId,
+        loan_file_id: loan.id,
         document_id: doc.id,
         category: "low_confidence_classification",
         severity: confidenceScore < 0.5 ? "high" : "warning",
         status: "open",
-        owner_id: user.id,
-        description: `Document "${file.name}" was classified as "${classifiedType}" with low confidence (${(confidenceScore * 100).toFixed(0)}%). Officer review recommended.`,
+        owner_id: loan.user_id,
+        description: `Borrower-uploaded document "${file.name}" classified as "${classifiedType}" with low confidence (${(confidenceScore * 100).toFixed(0)}%). Officer review recommended.`,
       });
 
       await supabase.from("file_completion_events").insert({
-        loan_file_id: loanFileId,
+        loan_file_id: loan.id,
         event_type: "escalation_created",
         actor: "system",
         payload: { document_id: doc.id, reason: "low_confidence_classification", confidence: confidenceScore },
       });
     }
 
-    // Refetch the updated document
+    // Refetch updated document
     const { data: updatedDoc } = await supabase
       .from("documents")
       .select("*")
@@ -268,8 +267,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     return NextResponse.json(successResponse(updatedDoc ?? doc), { status: 201 });
-  } catch (aiError) {
-    // AI pipeline failed — still return the uploaded doc, just mark as uploaded (not processed)
+  } catch {
+    // AI pipeline failed — mark as uploaded (not processed)
     await supabase
       .from("documents")
       .update({ status: "uploaded" })

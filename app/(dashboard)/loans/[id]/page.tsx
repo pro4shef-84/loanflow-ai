@@ -16,6 +16,10 @@ import { LOAN_TYPE_LABELS, LOAN_STATUS_ORDER } from "@/lib/types/loan.types";
 import type { ReadinessScore as ReadinessScoreType } from "@/lib/types/loan.types";
 import { ArrowLeft, ExternalLink, Copy } from "lucide-react";
 import Link from "next/link";
+import { EscalationBanner } from "@/components/escalations/EscalationBanner";
+import { FileCompletionChecklist } from "@/components/documents/FileCompletionChecklist";
+import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 
 export default function LoanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -93,6 +97,9 @@ export default function LoanDetailPage({ params }: { params: Promise<{ id: strin
           <TabsTrigger value="readiness" asChild><Link href={`/loans/${id}/readiness`}>Readiness</Link></TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {/* Escalation Banner */}
+      <EscalationBanner loanFileId={id} />
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -178,6 +185,15 @@ export default function LoanDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </CardContent>
           </Card>
+
+          {/* File Completion Checklist */}
+          <FileCompletionChecklist loanFileId={id} />
+
+          {/* Officer Review Panel */}
+          <ReviewPanel loanFileId={id} />
+
+          {/* Activity Timeline */}
+          <ActivityTimeline loanFileId={id} />
         </div>
       </div>
     </div>

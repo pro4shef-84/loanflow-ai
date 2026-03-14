@@ -164,6 +164,9 @@ export interface Database {
           portal_token: string | null;
           portal_expires_at: string | null;
           notes: string | null;
+          doc_workflow_state: string | null;
+          checklist_generated_at: string | null;
+          employment_type: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -190,6 +193,9 @@ export interface Database {
           portal_token?: string | null;
           portal_expires_at?: string | null;
           notes?: string | null;
+          doc_workflow_state?: string | null;
+          checklist_generated_at?: string | null;
+          employment_type?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -216,6 +222,9 @@ export interface Database {
           portal_token?: string | null;
           portal_expires_at?: string | null;
           notes?: string | null;
+          doc_workflow_state?: string | null;
+          checklist_generated_at?: string | null;
+          employment_type?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -239,6 +248,13 @@ export interface Database {
           uploaded_at: string | null;
           verified_at: string | null;
           expires_at: string | null;
+          requirement_id: string | null;
+          confidence_score: number | null;
+          ai_rationale: string | null;
+          issues: Json | null;
+          classification_raw: Json | null;
+          validated_at: string | null;
+          superseded_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -259,6 +275,13 @@ export interface Database {
           uploaded_at?: string | null;
           verified_at?: string | null;
           expires_at?: string | null;
+          requirement_id?: string | null;
+          confidence_score?: number | null;
+          ai_rationale?: string | null;
+          issues?: Json | null;
+          classification_raw?: Json | null;
+          validated_at?: string | null;
+          superseded_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -279,6 +302,13 @@ export interface Database {
           uploaded_at?: string | null;
           verified_at?: string | null;
           expires_at?: string | null;
+          requirement_id?: string | null;
+          confidence_score?: number | null;
+          ai_rationale?: string | null;
+          issues?: Json | null;
+          classification_raw?: Json | null;
+          validated_at?: string | null;
+          superseded_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -770,6 +800,171 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: Relationships;
+      };
+      document_requirements: {
+        Row: {
+          id: string;
+          loan_file_id: string;
+          doc_type: string;
+          state: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          loan_file_id: string;
+          doc_type: string;
+          state?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          loan_file_id?: string;
+          doc_type?: string;
+          state?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: Relationships;
+      };
+      escalations: {
+        Row: {
+          id: string;
+          loan_file_id: string;
+          document_id: string | null;
+          category: string;
+          severity: string;
+          status: string;
+          owner_id: string | null;
+          description: string | null;
+          resolution_notes: string | null;
+          resolved_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          loan_file_id: string;
+          document_id?: string | null;
+          category: string;
+          severity?: string;
+          status?: string;
+          owner_id?: string | null;
+          description?: string | null;
+          resolution_notes?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          loan_file_id?: string;
+          document_id?: string | null;
+          category?: string;
+          severity?: string;
+          status?: string;
+          owner_id?: string | null;
+          description?: string | null;
+          resolution_notes?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: Relationships;
+      };
+      review_decisions: {
+        Row: {
+          id: string;
+          loan_file_id: string;
+          user_id: string;
+          decision: "review_ready" | "needs_correction" | "archived";
+          notes: string | null;
+          document_snapshot: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          loan_file_id: string;
+          user_id: string;
+          decision: "review_ready" | "needs_correction" | "archived";
+          notes?: string | null;
+          document_snapshot?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          loan_file_id?: string;
+          user_id?: string;
+          decision?: "review_ready" | "needs_correction" | "archived";
+          notes?: string | null;
+          document_snapshot?: Json | null;
+          created_at?: string;
+        };
+        Relationships: Relationships;
+      };
+      document_reminders: {
+        Row: {
+          id: string;
+          loan_file_id: string;
+          requirement_id: string | null;
+          reminder_number: number;
+          channel: "email" | "sms";
+          status: string;
+          sent_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          loan_file_id: string;
+          requirement_id?: string | null;
+          reminder_number?: number;
+          channel: "email" | "sms";
+          status?: string;
+          sent_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          loan_file_id?: string;
+          requirement_id?: string | null;
+          reminder_number?: number;
+          channel?: "email" | "sms";
+          status?: string;
+          sent_at?: string;
+          created_at?: string;
+        };
+        Relationships: Relationships;
+      };
+      file_completion_events: {
+        Row: {
+          id: string;
+          loan_file_id: string | null;
+          event_type: string;
+          actor: string;
+          payload: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          loan_file_id?: string | null;
+          event_type: string;
+          actor?: string;
+          payload?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          loan_file_id?: string | null;
+          event_type?: string;
+          actor?: string;
+          payload?: Json | null;
+          created_at?: string;
         };
         Relationships: Relationships;
       };

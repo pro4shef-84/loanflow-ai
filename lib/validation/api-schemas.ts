@@ -150,6 +150,19 @@ export const updateDisclosureSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// File Completion Engine
+// ---------------------------------------------------------------------------
+export const resolveEscalationSchema = z.object({
+  action: z.enum(["resolve", "dismiss"]),
+  resolution: z.string().optional(),
+});
+
+export const submitReviewSchema = z.object({
+  decision: z.enum(["review_ready", "needs_correction", "archived"]),
+  notes: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Helper: parse or return 400
 // ---------------------------------------------------------------------------
 export function parseBody<T>(schema: z.ZodSchema<T>, data: unknown):
