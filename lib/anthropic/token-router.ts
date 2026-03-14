@@ -1,4 +1,9 @@
-import { MODELS, type ModelKey } from "./client";
+/**
+ * Token router — maps AI tasks to Gemini models and estimates cost.
+ * Migrated from Anthropic Claude to Google Gemini.
+ */
+
+import { MODELS, type ModelKey } from "@/lib/ai/client";
 
 export type TaskType =
   | "classify-document"
@@ -12,18 +17,18 @@ export type TaskType =
   | "non-qm-qa";
 
 const TASK_MODEL_MAP: Record<TaskType, ModelKey> = {
-  // Haiku tasks — fast, cheap, straightforward
-  "classify-document": "haiku",
-  "draft-status-message": "haiku",
-  "condition-plain-english": "haiku",
-  "pulse-summary": "haiku",
+  // Flash tasks — fast, cheap, straightforward
+  "classify-document": "flash",
+  "draft-status-message": "flash",
+  "condition-plain-english": "flash",
+  "pulse-summary": "flash",
 
-  // Sonnet tasks — complex reasoning required
-  "income-calculation": "sonnet",
-  "readiness-score": "sonnet",
-  "parse-conditions": "sonnet",
-  "validate-condition": "sonnet",
-  "non-qm-qa": "sonnet",
+  // Pro tasks — complex reasoning required
+  "income-calculation": "pro",
+  "readiness-score": "pro",
+  "parse-conditions": "pro",
+  "validate-condition": "pro",
+  "non-qm-qa": "pro",
 };
 
 export function getModelForTask(task: TaskType): string {
@@ -31,10 +36,13 @@ export function getModelForTask(task: TaskType): string {
   return MODELS[key];
 }
 
-// Approximate cost per 1M tokens (USD)
+/**
+ * Approximate cost per 1M tokens (USD) for Gemini 2.0 Flash.
+ * Gemini pricing: input $0.10/1M, output $0.40/1M (as of 2026-03).
+ */
 const COST_PER_1M: Record<ModelKey, { input: number; output: number }> = {
-  haiku: { input: 0.80, output: 4.0 },
-  sonnet: { input: 3.0, output: 15.0 },
+  flash: { input: 0.10, output: 0.40 },
+  pro: { input: 0.10, output: 0.40 },
 };
 
 export function estimateCost(

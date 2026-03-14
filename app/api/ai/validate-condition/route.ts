@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { proModel, extractJson } from "@/lib/ai/client";
 import type { Database } from "@/lib/types/database.types";
 import { getModelForTask } from "@/lib/anthropic/token-router";
 import { buildValidateConditionPrompt } from "@/lib/anthropic/prompts/validate-condition";
@@ -40,14 +40,13 @@ export async function POST(request: NextRequest) {
       maskedDocData
     );
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    const result = await proModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const parsed = JSON.parse(text);
+    const text = result.response.text();
+    const parsed = JSON.parse(extractJson(text));
 
     // Update condition status if satisfied
     if (parsed.satisfied) {
@@ -57,13 +56,14 @@ export async function POST(request: NextRequest) {
         .eq("id", conditionId);
     }
 
+    const usage = result.response.usageMetadata;
     await trackTokenUsage({
       userId: user.id,
       module: "validate-condition",
       model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      costUsd: estimateCost("validate-condition", response.usage.input_tokens, response.usage.output_tokens),
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: usage?.candidatesTokenCount ?? 0,
+      costUsd: estimateCost("validate-condition", usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0),
     });
 
     return NextResponse.json(successResponse(parsed));

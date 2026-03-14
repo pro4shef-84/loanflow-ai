@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { proModel, extractJson } from "@/lib/ai/client";
 import { getModelForTask } from "@/lib/anthropic/token-router";
 import { buildCalculateIncomePrompt } from "@/lib/anthropic/prompts/calculate-income";
 import { IncomeCalculationSchema } from "@/lib/anthropic/schemas/income-calculation";
@@ -35,23 +35,23 @@ export async function POST(request: NextRequest) {
     const model = getModelForTask("income-calculation");
     const prompt = buildCalculateIncomePrompt(maskedDocuments as unknown[]);
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
+    const result = await proModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const parsed = IncomeCalculationSchema.parse(JSON.parse(text));
+    const text = result.response.text();
+    const parsed = IncomeCalculationSchema.parse(JSON.parse(extractJson(text)));
 
+    const usage = result.response.usageMetadata;
     await trackTokenUsage({
       userId: user.id,
       loanFileId,
       module: "calculate-income",
       model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      costUsd: estimateCost("income-calculation", response.usage.input_tokens, response.usage.output_tokens),
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: usage?.candidatesTokenCount ?? 0,
+      costUsd: estimateCost("income-calculation", usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0),
     });
 
     return NextResponse.json(successResponse(parsed));

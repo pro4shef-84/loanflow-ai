@@ -1,13 +1,13 @@
 // ============================================================
 // DOCUMENT INTELLIGENCE AGENT
 // AI-powered document classification + deterministic validation
-// Pipeline: mark processing → Claude classify → validate → update states
+// Pipeline: mark processing -> Gemini classify -> validate -> update states
 // ============================================================
 
 import { createServiceClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database.types";
-import { anthropic, MODELS } from "@/lib/anthropic/client";
+import { flashModel, MODELS, extractJson } from "@/lib/ai/client";
 import { documentClassificationPrompt } from "@/lib/anthropic/prompts/file-completion";
 import {
   DocumentIntelligenceSchema,
@@ -48,7 +48,7 @@ export class DocumentIntelligenceAgent {
       // Step 1: Mark document as processing
       await this.updateDocumentState(db, params.documentId, "processing");
 
-      // Step 2: Build prompt and call Claude
+      // Step 2: Build prompt and call Gemini
       const prompt = documentClassificationPrompt({
         fileName: params.fileName,
         mimeType: params.mimeType,
@@ -57,7 +57,7 @@ export class DocumentIntelligenceAgent {
 
       let aiResult: DocumentIntelligenceOutput;
       try {
-        aiResult = await this.callClaude(prompt);
+        aiResult = await this.callGemini(prompt);
       } catch (aiError) {
         console.error("[DocumentIntelligenceAgent] AI classification failed:", {
           documentId: params.documentId,
@@ -276,19 +276,18 @@ export class DocumentIntelligenceAgent {
     }
   }
 
-  private async callClaude(prompt: string): Promise<DocumentIntelligenceOutput> {
-    const response = await anthropic.messages.create({
-      model: MODELS.haiku,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+  private async callGemini(prompt: string): Promise<DocumentIntelligenceOutput> {
+    const result = await flashModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const textBlock = response.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    const text = result.response.text();
+    if (!text) {
+      throw new Error("No text response from Gemini");
     }
 
-    const parsed = JSON.parse(textBlock.text) as unknown;
+    const parsed = JSON.parse(extractJson(text)) as unknown;
     const validated = DocumentIntelligenceSchema.parse(parsed);
     return validated;
   }

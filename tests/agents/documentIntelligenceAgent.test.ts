@@ -1,7 +1,7 @@
 // ============================================================
 // DOCUMENT INTELLIGENCE AGENT TESTS
 // Tests the AI document processing pipeline with mocked
-// Claude API and mocked Supabase client
+// Gemini API and mocked Supabase client
 // ============================================================
 
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
@@ -15,15 +15,25 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Mock the Anthropic client module
-vi.mock("@/lib/anthropic/client", () => ({
-  anthropic: {
-    messages: {
-      create: vi.fn(),
-    },
+// Mock the Gemini AI client module
+const mockGenerateContent = vi.fn();
+vi.mock("@/lib/ai/client", () => ({
+  flashModel: {
+    generateContent: mockGenerateContent,
+  },
+  proModel: {
+    generateContent: mockGenerateContent,
   },
   MODELS: {
-    haiku: "claude-haiku-4-5-20251001",
+    flash: "gemini-2.0-flash",
+    pro: "gemini-2.0-flash",
+  },
+  extractJson: (text: string) => {
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+    }
+    return cleaned.trim();
   },
 }));
 
@@ -40,7 +50,6 @@ vi.mock("@/lib/anthropic/schemas/file-completion", () => ({
 }));
 
 import { createServiceClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
 
 function makeAiResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -58,14 +67,15 @@ function makeAiResponse(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockClaudeResponse(aiResult: Record<string, unknown>) {
-  (anthropic.messages.create as Mock).mockResolvedValue({
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(aiResult),
+function mockGeminiResponse(aiResult: Record<string, unknown>) {
+  mockGenerateContent.mockResolvedValue({
+    response: {
+      text: () => JSON.stringify(aiResult),
+      usageMetadata: {
+        promptTokenCount: 100,
+        candidatesTokenCount: 50,
       },
-    ],
+    },
   });
 }
 
@@ -78,12 +88,6 @@ const DEFAULT_PARAMS = {
 };
 
 function setupMockSupabase(responses: MockResponses = {}) {
-  // document_requirements.select is called multiple times in the full pipeline:
-  //   1) transitionRequirement() calls .single() — expects object
-  //   2) evaluateLoanDocStatus() expects array of { state }
-  // loan_files.select is called multiple times:
-  //   1) evaluateLoanDocStatus() first call — expects object with doc_workflow_state
-  //   2) transitionDocWorkflow() — expects object with doc_workflow_state
   const defaultResponses: MockResponses = {
     "documents.select": {
       data: { classification_raw: {} },
@@ -122,12 +126,12 @@ describe("DocumentIntelligenceAgent", () => {
     agent = new DocumentIntelligenceAgent();
   });
 
-  // ── High confidence processing ────────────────────────────
+  // -- High confidence processing ----
 
   describe("high confidence (>= 0.75)", () => {
     it("should process normally and run validation when confidence is high", async () => {
       const aiResult = makeAiResponse({ confidence_score: 0.92 });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -152,7 +156,7 @@ describe("DocumentIntelligenceAgent", () => {
           ytd_income: "75000",
         },
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -171,7 +175,7 @@ describe("DocumentIntelligenceAgent", () => {
           // Missing employer_name, pay_period, ytd_income
         },
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -186,12 +190,12 @@ describe("DocumentIntelligenceAgent", () => {
     });
   });
 
-  // ── Low confidence processing ─────────────────────────────
+  // -- Low confidence processing -----
 
   describe("low confidence (< 0.75)", () => {
     it("should create escalation and set needs_officer_review", async () => {
       const aiResult = makeAiResponse({ confidence_score: 0.55 });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -213,7 +217,7 @@ describe("DocumentIntelligenceAgent", () => {
 
     it("should include confidence percentage in the issues", async () => {
       const aiResult = makeAiResponse({ confidence_score: 0.42 });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -222,7 +226,7 @@ describe("DocumentIntelligenceAgent", () => {
     });
   });
 
-  // ── Unknown document classification ───────────────────────
+  // -- Unknown document classification ---
 
   describe("unknown document classification", () => {
     it("should reject unknown documents", async () => {
@@ -231,7 +235,7 @@ describe("DocumentIntelligenceAgent", () => {
         confidence_score: 0.80,
         issues: ["Could not determine document type"],
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -248,7 +252,7 @@ describe("DocumentIntelligenceAgent", () => {
     });
   });
 
-  // ── Suspicious indicators ─────────────────────────────────
+  // -- Suspicious indicators ---------
 
   describe("suspicious indicators", () => {
     it("should create critical escalation for documents with 'altered' in rationale", async () => {
@@ -257,7 +261,7 @@ describe("DocumentIntelligenceAgent", () => {
         rationale_summary: "Document appears to have been altered with editing software.",
         issues: [],
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -277,7 +281,7 @@ describe("DocumentIntelligenceAgent", () => {
         rationale_summary: "Pay stub looks normal.",
         issues: ["Font appears modified in income section"],
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -290,7 +294,7 @@ describe("DocumentIntelligenceAgent", () => {
         confidence_score: 0.85,
         rationale_summary: "Suspicious formatting detected in the document header.",
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -299,11 +303,11 @@ describe("DocumentIntelligenceAgent", () => {
     });
   });
 
-  // ── AI failure ────────────────────────────────────────────
+  // -- AI failure --------------------
 
   describe("AI classification failure", () => {
-    it("should escalate for human review when Claude API fails", async () => {
-      (anthropic.messages.create as Mock).mockRejectedValue(
+    it("should escalate for human review when Gemini API fails", async () => {
+      mockGenerateContent.mockRejectedValue(
         new Error("API rate limit exceeded")
       );
       const { calls } = setupMockSupabase();
@@ -327,7 +331,7 @@ describe("DocumentIntelligenceAgent", () => {
     });
   });
 
-  // ── Validation pass → tentatively_satisfied ───────────────
+  // -- Validation pass -> tentatively_satisfied ---
 
   describe("validation outcomes", () => {
     it("should transition requirement to tentatively_satisfied on validation pass", async () => {
@@ -339,7 +343,7 @@ describe("DocumentIntelligenceAgent", () => {
           id_type: "drivers_license",
         },
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);
@@ -362,7 +366,7 @@ describe("DocumentIntelligenceAgent", () => {
           // all_pages not true, page_count < 2
         },
       });
-      mockClaudeResponse(aiResult);
+      mockGeminiResponse(aiResult);
       const { calls } = setupMockSupabase();
 
       const result = await agent.processDocument(DEFAULT_PARAMS);

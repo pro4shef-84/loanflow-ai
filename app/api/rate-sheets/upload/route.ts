@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { flashModel, extractJson } from "@/lib/ai/client";
 import type { Json } from "@/lib/types/database.types";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 
@@ -34,16 +34,6 @@ Rules:
 - Include ALL programs found. Map them to the closest key above.
 - If you cannot parse a program, skip it.
 - Return ONLY the JSON, no markdown, no explanation, no code blocks.`;
-
-/** Strip markdown code blocks from Claude response */
-function extractJson(text: string): string {
-  let cleaned = text.trim();
-  // Remove ```json ... ``` wrapper
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
-  }
-  return cleaned.trim();
-}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -107,7 +97,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Step 3: Parse with Claude
+  // Step 3: Parse with Gemini
   const pdfBase64 = Buffer.from(buffer).toString("base64");
 
   let parsedRates: Json | null = null;
@@ -117,24 +107,12 @@ export async function POST(request: NextRequest) {
   let parsedLenderName = lenderName;
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: pdfBase64 },
-            },
-            { type: "text", text: PARSE_PROMPT },
-          ],
-        },
-      ],
-    });
+    const result = await flashModel.generateContent([
+      { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+      { text: PARSE_PROMPT },
+    ]);
 
-    const rawText = response.content[0].type === "text" ? response.content[0].text : "{}";
+    const rawText = result.response.text();
     const jsonText = extractJson(rawText);
     const parsed = JSON.parse(jsonText);
 
@@ -150,14 +128,14 @@ export async function POST(request: NextRequest) {
       msg = err.message;
     }
 
-    // Detect Anthropic billing / credit errors and surface a user-friendly message
+    // Detect billing / quota errors and surface a user-friendly message
     const errString = String(err);
     if (
-      errString.includes("credit balance is too low") ||
+      errString.includes("quota") ||
       errString.includes("billing") ||
-      errString.includes("purchase credits")
+      errString.includes("RESOURCE_EXHAUSTED")
     ) {
-      msg = "AI parsing is temporarily unavailable (billing limit reached). The file was uploaded — parsing will be retried.";
+      msg = "AI parsing is temporarily unavailable (quota limit reached). The file was uploaded — parsing will be retried.";
     }
 
     console.error("[rate-sheets/upload] Parse error:", errString);

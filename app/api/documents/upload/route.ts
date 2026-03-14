@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import type { Database } from "@/lib/types/database.types";
-import { anthropic, MODELS } from "@/lib/anthropic/client";
+import { flashModel, MODELS, extractJson } from "@/lib/ai/client";
 import { buildClassifyPrompt } from "@/lib/anthropic/prompts/classify-document";
 import { validateDocument } from "@/lib/domain/rules/documentValidationRules";
 import { buildExtractDocumentPrompt } from "@/lib/anthropic/prompts/extract-document";
@@ -110,22 +110,21 @@ export async function POST(request: NextRequest) {
 
   // --- AI Classification Pipeline ---
   try {
-    // Step 1: Classify document via Claude
+    // Step 1: Classify document via Gemini
     const classifyPrompt = buildClassifyPrompt(file.name);
-    const classifyResponse = await anthropic.messages.create({
-      model: MODELS.haiku,
-      max_tokens: 500,
-      messages: [{ role: "user", content: classifyPrompt }],
+    const classifyResult = await flashModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: classifyPrompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const classifyText = classifyResponse.content.find((b) => b.type === "text");
+    const classifyText = classifyResult.response.text();
     let classifiedType: DocumentType = (documentType ?? "other") as DocumentType;
     let confidenceScore = 0;
     let rationale = "";
     let classificationRaw: Json = {};
 
-    if (classifyText && classifyText.type === "text") {
-      const jsonMatch = classifyText.text.match(/\{[\s\S]*\}/);
+    if (classifyText) {
+      const jsonMatch = classifyText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as { type?: string; confidence?: number; reasoning?: string };
         classifiedType = (parsed.type ?? classifiedType) as DocumentType;
@@ -136,16 +135,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Track classification token usage
+    const classifyUsage = classifyResult.response.usageMetadata;
     await supabase.from("token_usage").insert({
       user_id: user.id,
       loan_file_id: loanFileId,
       module: "classify-document",
-      model: MODELS.haiku,
-      input_tokens: classifyResponse.usage.input_tokens,
-      output_tokens: classifyResponse.usage.output_tokens,
+      model: MODELS.flash,
+      input_tokens: classifyUsage?.promptTokenCount ?? 0,
+      output_tokens: classifyUsage?.candidatesTokenCount ?? 0,
       cost_usd:
-        (classifyResponse.usage.input_tokens / 1_000_000) * 0.8 +
-        (classifyResponse.usage.output_tokens / 1_000_000) * 4.0,
+        ((classifyUsage?.promptTokenCount ?? 0) / 1_000_000) * 0.10 +
+        ((classifyUsage?.candidatesTokenCount ?? 0) / 1_000_000) * 0.40,
     });
 
     // Log classification event
@@ -158,32 +158,32 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Extract fields for validation
     const extractPrompt = buildExtractDocumentPrompt(classifiedType, `Filename: ${file.name}`);
-    const extractResponse = await anthropic.messages.create({
-      model: MODELS.haiku,
-      max_tokens: 1000,
-      messages: [{ role: "user", content: extractPrompt }],
+    const extractResult = await flashModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: extractPrompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
     let extractedFields: ExtractedFields = {};
-    const extractText = extractResponse.content.find((b) => b.type === "text");
-    if (extractText && extractText.type === "text") {
-      const jsonMatch = extractText.text.match(/\{[\s\S]*\}/);
+    const extractText = extractResult.response.text();
+    if (extractText) {
+      const jsonMatch = extractText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         extractedFields = JSON.parse(jsonMatch[0]) as ExtractedFields;
       }
     }
 
     // Track extraction token usage
+    const extractUsage = extractResult.response.usageMetadata;
     await supabase.from("token_usage").insert({
       user_id: user.id,
       loan_file_id: loanFileId,
       module: "extract-document",
-      model: MODELS.haiku,
-      input_tokens: extractResponse.usage.input_tokens,
-      output_tokens: extractResponse.usage.output_tokens,
+      model: MODELS.flash,
+      input_tokens: extractUsage?.promptTokenCount ?? 0,
+      output_tokens: extractUsage?.candidatesTokenCount ?? 0,
       cost_usd:
-        (extractResponse.usage.input_tokens / 1_000_000) * 0.8 +
-        (extractResponse.usage.output_tokens / 1_000_000) * 4.0,
+        ((extractUsage?.promptTokenCount ?? 0) / 1_000_000) * 0.10 +
+        ((extractUsage?.candidatesTokenCount ?? 0) / 1_000_000) * 0.40,
     });
 
     // Step 3: Run deterministic validation

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { flashModel } from "@/lib/ai/client";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import { parseBody, generatePreapprovalSchema } from "@/lib/validation/api-schemas";
 import type { Database } from "@/lib/types/database.types";
@@ -80,13 +80,11 @@ The letter should:
 7. Be formal, concise (3-4 paragraphs), and professional
 8. Include a standard disclaimer about it not being a commitment to lend`;
 
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const result = await flashModel.generateContent([
+      { text: prompt },
+    ]);
 
-    const letterText = response.content[0].type === "text" ? response.content[0].text : "";
+    const letterText = result.response.text();
 
     return NextResponse.json(successResponse({
       letter: letterText,

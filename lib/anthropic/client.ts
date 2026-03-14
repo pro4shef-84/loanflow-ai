@@ -1,12 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-});
+/**
+ * @deprecated — Anthropic client is no longer used.
+ * All AI features have been migrated to Google Gemini.
+ * See lib/ai/client.ts for the active AI client.
+ */
 
 export const MODELS = {
-  haiku: "claude-haiku-4-5-20251001",
-  sonnet: "claude-sonnet-4-6",
+  haiku: "gemini-2.0-flash",
+  sonnet: "gemini-2.0-flash",
 } as const;
 
 export type ModelKey = keyof typeof MODELS;

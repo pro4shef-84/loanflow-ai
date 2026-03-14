@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { flashModel, extractJson } from "@/lib/ai/client";
 import { getModelForTask } from "@/lib/anthropic/token-router";
 import { buildExtractDocumentPrompt } from "@/lib/anthropic/prompts/extract-document";
 import { DocumentExtractionSchema } from "@/lib/anthropic/schemas/document-extraction";
@@ -30,18 +30,17 @@ export async function POST(request: NextRequest) {
 
     if (!doc) return NextResponse.json(errorResponse("Document not found"), { status: 404 });
 
-    const model = getModelForTask("classify-document"); // Haiku for extraction
+    const model = getModelForTask("classify-document"); // flash for extraction
     const maskedText = maskPii(documentText);
     const prompt = buildExtractDocumentPrompt(doc.type, maskedText);
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    const result = await flashModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const rawParsed = JSON.parse(text);
+    const text = result.response.text();
+    const rawParsed = JSON.parse(extractJson(text));
     const parsed = DocumentExtractionSchema.parse(rawParsed);
 
     await serviceClient
@@ -54,15 +53,16 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", documentId);
 
+    const usage = result.response.usageMetadata;
     if (user) {
       await trackTokenUsage({
         userId: user.id,
         loanFileId: doc.loan_file_id,
         module: "extract-document",
         model,
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-        costUsd: estimateCost("classify-document", response.usage.input_tokens, response.usage.output_tokens),
+        inputTokens: usage?.promptTokenCount ?? 0,
+        outputTokens: usage?.candidatesTokenCount ?? 0,
+        costUsd: estimateCost("classify-document", usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0),
       });
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { proModel, extractJson } from "@/lib/ai/client";
 import { getModelForTask } from "@/lib/anthropic/token-router";
 import { buildReadinessScorePrompt } from "@/lib/anthropic/prompts/readiness-score";
 import type { FileCompletionContext } from "@/lib/anthropic/prompts/readiness-score";
@@ -113,14 +113,13 @@ export async function POST(request: NextRequest) {
     const model = getModelForTask("readiness-score");
     const prompt = buildReadinessScorePrompt(maskedData, fileCompletionCtx);
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
+    const result = await proModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const parsed = ReadinessScoreSchema.parse(JSON.parse(text));
+    const text = result.response.text();
+    const parsed = ReadinessScoreSchema.parse(JSON.parse(extractJson(text)));
 
     // Save to loan file
     await serviceClient
@@ -131,14 +130,15 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", loanFileId);
 
+    const usage = result.response.usageMetadata;
     await trackTokenUsage({
       userId: user.id,
       loanFileId,
       module: "readiness-score",
       model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      costUsd: estimateCost("readiness-score", response.usage.input_tokens, response.usage.output_tokens),
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: usage?.candidatesTokenCount ?? 0,
+      costUsd: estimateCost("readiness-score", usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0),
     });
 
     return NextResponse.json(successResponse(parsed));

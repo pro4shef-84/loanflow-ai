@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
-import Anthropic from "@anthropic-ai/sdk";
+import { flashModel, extractJson } from "@/lib/ai/client";
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Json } from "@/lib/types/database.types";
 
@@ -121,7 +120,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // Parse with Claude
+    // Parse with Gemini
     const pdfBase64 = Buffer.from(buffer).toString("base64");
     let parsedRates: Json | null = null;
     let parseError: string | null = null;
@@ -130,25 +129,13 @@ export async function POST(request: NextRequest) {
     let expiresAt: string | null = null;
 
     try {
-      const response = await anthropic.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "document",
-                source: { type: "base64", media_type: "application/pdf", data: pdfBase64 },
-              } as Anthropic.DocumentBlockParam,
-              { type: "text", text: PARSE_PROMPT } as Anthropic.TextBlockParam,
-            ],
-          },
-        ],
-      });
+      const result = await flashModel.generateContent([
+        { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+        { text: PARSE_PROMPT },
+      ]);
 
-      const text = response.content[0].type === "text" ? response.content[0].text.trim() : "{}";
-      const parsed = JSON.parse(text);
+      const text = result.response.text().trim();
+      const parsed = JSON.parse(extractJson(text));
       parsedRates = parsed as Json;
       parsedLenderName = parsed.lender_name ?? subject;
       effectiveDate = parsed.effective_date ?? null;

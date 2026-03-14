@@ -5,9 +5,8 @@
 // ============================================================
 
 import { createServiceClient } from "@/lib/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database.types";
-import { anthropic, MODELS } from "@/lib/anthropic/client";
+import { proModel, extractJson } from "@/lib/ai/client";
 import { officerCopilotPrompt } from "@/lib/anthropic/prompts/file-completion";
 import {
   OfficerCopilotSchema,
@@ -24,7 +23,7 @@ export class ReviewCopilotAgent {
   /**
    * Generate an AI-powered review summary for a loan file.
    * Fetches all context (requirements, escalations, borrower info)
-   * and calls Claude for a structured summary.
+   * and calls Gemini for a structured summary.
    */
   async generateSummary(loanFileId: string): Promise<OfficerCopilotOutput | null> {
     const db = await createServiceClient();
@@ -113,7 +112,7 @@ export class ReviewCopilotAgent {
         .eq("loan_file_id", loanFileId)
         .in("status", ["open", "acknowledged"]);
 
-      // Build prompt and call Claude
+      // Build prompt and call Gemini
       const prompt = officerCopilotPrompt({
         loanFileId,
         borrowerName,
@@ -127,19 +126,18 @@ export class ReviewCopilotAgent {
         })),
       });
 
-      const response = await anthropic.messages.create({
-        model: MODELS.sonnet,
-        max_tokens: 2048,
-        messages: [{ role: "user", content: prompt }],
+      const result = await proModel.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" },
       });
 
-      const textBlock = response.content.find((block) => block.type === "text");
-      if (!textBlock || textBlock.type !== "text") {
-        console.error("[ReviewCopilotAgent] No text response from Claude");
+      const text = result.response.text();
+      if (!text) {
+        console.error("[ReviewCopilotAgent] No text response from Gemini");
         return null;
       }
 
-      const parsed = JSON.parse(textBlock.text) as unknown;
+      const parsed = JSON.parse(extractJson(text)) as unknown;
       const validated = OfficerCopilotSchema.parse(parsed);
       return validated;
     } catch (error) {

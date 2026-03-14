@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { flashModel, extractJson } from "@/lib/ai/client";
 import { getModelForTask } from "@/lib/anthropic/token-router";
 import { buildDraftMessagePrompt } from "@/lib/anthropic/prompts/draft-message";
 import type { DraftMessageParams } from "@/lib/anthropic/prompts/draft-message";
@@ -24,22 +24,22 @@ export async function POST(request: NextRequest) {
     const model = getModelForTask("draft-status-message");
     const prompt = buildDraftMessagePrompt({ purpose, recipientType, channel, tone: tone ?? "professional", loanContext, specificInstructions });
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 512,
-      messages: [{ role: "user", content: prompt }],
+    const result = await flashModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const parsed = JSON.parse(text);
+    const text = result.response.text();
+    const parsed = JSON.parse(extractJson(text));
 
+    const usage = result.response.usageMetadata;
     await trackTokenUsage({
       userId: user.id,
       module: "draft-message",
       model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      costUsd: estimateCost("draft-status-message", response.usage.input_tokens, response.usage.output_tokens),
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: usage?.candidatesTokenCount ?? 0,
+      costUsd: estimateCost("draft-status-message", usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0),
     });
 
     return NextResponse.json(successResponse(parsed));

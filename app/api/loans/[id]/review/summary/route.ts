@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import type { Database } from "@/lib/types/database.types";
-import { anthropic, MODELS } from "@/lib/anthropic/client";
+import { flashModel, MODELS, extractJson } from "@/lib/ai/client";
 import type { OfficerReviewSummary } from "@/lib/domain/entities";
 
 type Params = { params: Promise<{ id: string }> };
@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
   const loan = loanData as unknown as LoanWithRelations;
 
-  // Build context for Claude
+  // Build context for Gemini
   const requirementsSummary = loan.document_requirements.map((r) => ({
     doc_type: r.doc_type,
     state: r.state,
@@ -87,36 +87,30 @@ Return a JSON object with this exact structure:
 Be concise and actionable. Focus on items that need the officer's attention.`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: MODELS.haiku,
-      max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
+    const result = await flashModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const textBlock = response.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+    const text = result.response.text();
+    if (!text) {
       return NextResponse.json(errorResponse("AI response was empty"), { status: 500 });
     }
 
-    // Parse the JSON from Claude's response
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json(errorResponse("Could not parse AI summary"), { status: 500 });
-    }
-
-    const summary = JSON.parse(jsonMatch[0]) as Omit<OfficerReviewSummary, "loan_file_id">;
+    const summary = JSON.parse(extractJson(text)) as Omit<OfficerReviewSummary, "loan_file_id">;
 
     // Track token usage
+    const usage = result.response.usageMetadata;
     await supabase.from("token_usage").insert({
       user_id: user.id,
       loan_file_id: id,
       module: "review-summary",
-      model: MODELS.haiku,
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
+      model: MODELS.flash,
+      input_tokens: usage?.promptTokenCount ?? 0,
+      output_tokens: usage?.candidatesTokenCount ?? 0,
       cost_usd:
-        (response.usage.input_tokens / 1_000_000) * 0.8 +
-        (response.usage.output_tokens / 1_000_000) * 4.0,
+        ((usage?.promptTokenCount ?? 0) / 1_000_000) * 0.10 +
+        ((usage?.candidatesTokenCount ?? 0) / 1_000_000) * 0.40,
     });
 
     return NextResponse.json(

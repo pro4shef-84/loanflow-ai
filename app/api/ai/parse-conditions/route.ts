@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { proModel, extractJson } from "@/lib/ai/client";
 import { getModelForTask } from "@/lib/anthropic/token-router";
 import { buildParseConditionsPrompt } from "@/lib/anthropic/prompts/parse-conditions";
 import { ParseConditionsResponseSchema } from "@/lib/anthropic/schemas/condition-parse";
@@ -24,14 +24,13 @@ export async function POST(request: NextRequest) {
     const model = getModelForTask("parse-conditions");
     const prompt = buildParseConditionsPrompt(conditionText);
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
+    const result = await proModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const parsed = ParseConditionsResponseSchema.parse(JSON.parse(text));
+    const text = result.response.text();
+    const parsed = ParseConditionsResponseSchema.parse(JSON.parse(extractJson(text)));
 
     // Insert conditions into database
     const conditionInserts = parsed.conditions.map((c) => ({
@@ -46,14 +45,15 @@ export async function POST(request: NextRequest) {
 
     await supabase.from("conditions").insert(conditionInserts);
 
+    const usage = result.response.usageMetadata;
     await trackTokenUsage({
       userId: user.id,
       loanFileId,
       module: "parse-conditions",
       model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      costUsd: estimateCost("parse-conditions", response.usage.input_tokens, response.usage.output_tokens),
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: usage?.candidatesTokenCount ?? 0,
+      costUsd: estimateCost("parse-conditions", usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0),
     });
 
     return NextResponse.json(successResponse({ count: parsed.conditions.length, conditions: parsed.conditions }));

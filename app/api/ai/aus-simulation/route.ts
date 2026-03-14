@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { anthropic } from "@/lib/anthropic/client";
+import { proModel, extractJson } from "@/lib/ai/client";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import { parseBody, ausSimulationSchema } from "@/lib/validation/api-schemas";
 import type { Database } from "@/lib/types/database.types";
@@ -93,19 +93,18 @@ Loan Data:
 
 Return ONLY valid JSON, no markdown.`;
 
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    const result = await proModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
+    const text = result.response.text();
 
-    let result: AUSResult;
+    let ausResult: AUSResult;
     try {
-      result = JSON.parse(text.trim()) as AUSResult;
+      ausResult = JSON.parse(extractJson(text)) as AUSResult;
     } catch {
-      result = {
+      ausResult = {
         recommendation: "REFER",
         confidence: 0,
         risk_level: "high",
@@ -116,7 +115,7 @@ Return ONLY valid JSON, no markdown.`;
     }
 
     return NextResponse.json(successResponse({
-      ...result,
+      ...ausResult,
       inputs: { creditScore, monthlyIncome, monthlyDebts, dti, ltv, reserveMonths },
     }));
   } catch (err) {

@@ -8,6 +8,10 @@ const REQUIRED_SERVER_VARS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "GEMINI_API_KEY",
+] as const;
+
+const OPTIONAL_SERVER_VARS = [
   "ANTHROPIC_API_KEY",
 ] as const;
 
@@ -28,7 +32,8 @@ export const env = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
+  geminiApiKey: process.env.GEMINI_API_KEY!,
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
