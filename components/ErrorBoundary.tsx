@@ -26,6 +26,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+    // Report to error tracking
+    import("@/lib/utils/error-reporter").then(({ reportUiError }) => {
+      reportUiError(error, { componentStack: info.componentStack });
+    });
   }
 
   render() {
