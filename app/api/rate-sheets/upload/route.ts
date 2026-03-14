@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { anthropic } from "@/lib/anthropic/client";
 import type { Json } from "@/lib/types/database.types";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
+
+// Vercel serverless function timeout — 60s for Pro, 10s for Hobby
+export const maxDuration = 60;
 
 const PARSE_PROMPT = `You are parsing a mortgage lender rate sheet PDF.
 Extract all rate pricing data and return ONLY a valid JSON object in this exact structure:
@@ -31,14 +33,32 @@ Rules:
 - par_price 100.000 = 0 points. 100.5 = -0.5 points (credit). 99.5 = +0.5 points (cost)
 - Include ALL programs found. Map them to the closest key above.
 - If you cannot parse a program, skip it.
-- Return ONLY the JSON, no markdown, no explanation.`;
+- Return ONLY the JSON, no markdown, no explanation, no code blocks.`;
+
+/** Strip markdown code blocks from Claude response */
+function extractJson(text: string): string {
+  let cleaned = text.trim();
+  // Remove ```json ... ``` wrapper
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+  }
+  return cleaned.trim();
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json(errorResponse("Invalid form data"), { status: 400 });
+  }
+
   const file = formData.get("file") as File | null;
   const lenderName = (formData.get("lenderName") as string | null)?.trim() ?? "Unknown Lender";
 
@@ -50,21 +70,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(errorResponse("File too large (max 20MB)"), { status: 400 });
   }
 
-  // Store to Supabase Storage
-  const serviceClient = await createServiceClient();
-  const path = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   const buffer = await file.arrayBuffer();
+  const path = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
+  // Use service client for BOTH storage and DB to avoid RLS issues
+  const serviceClient = await createServiceClient();
+
+  // Step 1: Upload to storage
   const { error: uploadError } = await serviceClient.storage
     .from("rate-sheets")
     .upload(path, buffer, { contentType: "application/pdf", upsert: false });
 
   if (uploadError) {
+    console.error("[rate-sheets/upload] Storage error:", uploadError);
     return NextResponse.json(errorResponse(`Storage error: ${uploadError.message}`), { status: 500 });
   }
 
-  // Create DB record immediately so UI shows "processing" state
-  const { data: sheetRecord, error: insertError } = await supabase
+  // Step 2: Create DB record (use service client to bypass RLS)
+  const { data: sheetRecord, error: insertError } = await serviceClient
     .from("rate_sheets")
     .insert({
       user_id: user.id,
@@ -77,10 +100,14 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insertError || !sheetRecord) {
-    return NextResponse.json(errorResponse("Failed to create rate sheet record"), { status: 500 });
+    console.error("[rate-sheets/upload] DB insert error:", insertError);
+    return NextResponse.json(
+      errorResponse(`Failed to create rate sheet record: ${insertError?.message ?? "unknown"}`),
+      { status: 500 }
+    );
   }
 
-  // Send PDF to Claude for parsing
+  // Step 3: Parse with Claude
   const pdfBase64 = Buffer.from(buffer).toString("base64");
 
   let parsedRates: Json | null = null;
@@ -92,30 +119,24 @@ export async function POST(request: NextRequest) {
   try {
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [
         {
           role: "user",
           content: [
             {
               type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: pdfBase64,
-              },
-            } as Anthropic.DocumentBlockParam,
-            {
-              type: "text",
-              text: PARSE_PROMPT,
-            } as Anthropic.TextBlockParam,
+              source: { type: "base64", media_type: "application/pdf", data: pdfBase64 },
+            },
+            { type: "text", text: PARSE_PROMPT },
           ],
         },
       ],
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text.trim() : "{}";
-    const parsed = JSON.parse(text);
+    const rawText = response.content[0].type === "text" ? response.content[0].text : "{}";
+    const jsonText = extractJson(rawText);
+    const parsed = JSON.parse(jsonText);
 
     parsedRates = parsed as Json;
     parsedLenderName = parsed.lender_name ?? lenderName;
@@ -124,11 +145,13 @@ export async function POST(request: NextRequest) {
       expiresAt = new Date(parsed.expires_date).toISOString();
     }
   } catch (err) {
-    parseError = err instanceof Error ? err.message : "Failed to parse rate sheet";
+    const msg = err instanceof Error ? err.message : "Failed to parse rate sheet";
+    console.error("[rate-sheets/upload] Parse error:", msg);
+    parseError = msg;
   }
 
-  // Update DB record with results
-  const { data: updated, error: updateError } = await supabase
+  // Step 4: Update DB with results (use service client)
+  const { data: updated, error: updateError } = await serviceClient
     .from("rate_sheets")
     .update({
       lender_name: parsedLenderName,
@@ -143,7 +166,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (updateError) {
-    return NextResponse.json(errorResponse("Parse completed but failed to save"), { status: 500 });
+    console.error("[rate-sheets/upload] Update error:", updateError);
+    return NextResponse.json(errorResponse("Parse completed but failed to save results"), { status: 500 });
   }
 
   return NextResponse.json(successResponse(updated), { status: 201 });
