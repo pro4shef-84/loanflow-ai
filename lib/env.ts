@@ -41,4 +41,5 @@ export const env = {
   stripeProPriceId: process.env.STRIPE_PRO_PRICE_ID ?? "",
   stripeTeamPriceId: process.env.STRIPE_TEAM_PRICE_ID ?? "",
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  cronSecret: process.env.CRON_SECRET ?? "",
 } as const;

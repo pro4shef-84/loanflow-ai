@@ -95,6 +95,8 @@ export default function LoanDetailPage({ params }: { params: Promise<{ id: strin
           <TabsTrigger value="submission" asChild><Link href={`/loans/${id}/submission`}>Submission</Link></TabsTrigger>
           <TabsTrigger value="disclosures" asChild><Link href={`/loans/${id}/disclosures`}>Disclosures</Link></TabsTrigger>
           <TabsTrigger value="readiness" asChild><Link href={`/loans/${id}/readiness`}>Readiness</Link></TabsTrigger>
+          <TabsTrigger value="narrative" asChild><Link href={`/loans/${id}/narrative`}>Narrative</Link></TabsTrigger>
+          <TabsTrigger value="audit" asChild><Link href={`/loans/${id}/audit`}>Audit Log</Link></TabsTrigger>
         </TabsList>
       </Tabs>
 

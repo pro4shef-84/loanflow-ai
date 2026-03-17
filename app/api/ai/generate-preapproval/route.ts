@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { flashModel } from "@/lib/ai/client";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import { parseBody, generatePreapprovalSchema } from "@/lib/validation/api-schemas";
+import { checkAiRateLimit, rateLimitResponse } from "@/lib/utils/ai-rate-limiter";
 import type { Database } from "@/lib/types/database.types";
 
 type LoanRow = Database["public"]["Tables"]["loan_files"]["Row"];
@@ -14,6 +15,10 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
+
+    const { data: profile } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+    const rateLimit = await checkAiRateLimit(supabase, user.id, profile?.subscription_tier ?? "trial");
+    if (!rateLimit.allowed) return NextResponse.json(rateLimitResponse(rateLimit), { status: 429 });
 
     const rawBody = await request.json();
     const parsed = parseBody(generatePreapprovalSchema, rawBody);

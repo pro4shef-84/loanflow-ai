@@ -4,6 +4,7 @@ import { proModel, extractJson } from "@/lib/ai/client";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import { parseBody, ausSimulationSchema } from "@/lib/validation/api-schemas";
 import type { Database } from "@/lib/types/database.types";
+import { checkAiRateLimit, rateLimitResponse } from "@/lib/utils/ai-rate-limiter";
 
 type LoanRow = Database["public"]["Tables"]["loan_files"]["Row"];
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
@@ -29,6 +30,13 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
+
+    // Rate limit check
+    const { data: profile } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+    const rateLimit = await checkAiRateLimit(supabase, user.id, profile?.subscription_tier ?? "trial");
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimitResponse(rateLimit), { status: 429 });
+    }
 
     const rawBody = await request.json();
     const parsed = parseBody(ausSimulationSchema, rawBody);

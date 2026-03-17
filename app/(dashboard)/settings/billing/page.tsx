@@ -5,22 +5,41 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, ArrowLeft } from "lucide-react";
+import { Check, ArrowLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 export default function BillingPage() {
   const { profile } = useAuth();
   const currentTier = profile?.subscription_tier ?? "trial";
+  const isSubscribed = currentTier !== "trial";
+  const [loading, setLoading] = useState<string | null>(null);
 
   const handleSubscribe = async (tier: string) => {
-    const res = await fetch("/api/stripe/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tier }),
-    });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
+    setLoading(tier);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier }),
+      });
+      const { url } = await res.json();
+      if (url) window.location.href = url;
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setLoading("portal");
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const { url } = await res.json();
+      if (url) window.location.href = url;
+    } finally {
+      setLoading(null);
+    }
   };
 
   return (
@@ -34,6 +53,23 @@ export default function BillingPage() {
           <p className="text-muted-foreground">Choose the right plan for your pipeline</p>
         </div>
       </div>
+
+      {isSubscribed && (
+        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+          <div>
+            <p className="font-medium">Current plan: <span className="capitalize">{currentTier}</span></p>
+            <p className="text-sm text-muted-foreground">Manage payment method, invoices, and cancellation</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleManageSubscription}
+            disabled={loading === "portal"}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            {loading === "portal" ? "Loading..." : "Manage Subscription"}
+          </Button>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-6">
         {Object.entries(PLANS).map(([tier, plan]) => {
@@ -68,10 +104,10 @@ export default function BillingPage() {
                 <Button
                   className="w-full"
                   variant={isPro ? "default" : "outline"}
-                  disabled={isCurrentPlan}
+                  disabled={isCurrentPlan || loading === tier}
                   onClick={() => handleSubscribe(tier)}
                 >
-                  {isCurrentPlan ? "Current Plan" : "Upgrade"}
+                  {loading === tier ? "Loading..." : isCurrentPlan ? "Current Plan" : isSubscribed ? "Switch Plan" : "Upgrade"}
                 </Button>
               </CardFooter>
             </Card>

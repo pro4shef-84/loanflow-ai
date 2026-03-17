@@ -1,13 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { PortalChecklist } from "@/components/portal/PortalChecklist";
 import { PortalFileCompletion } from "@/components/portal/PortalFileCompletion";
+import { PortalMessaging } from "@/components/portal/PortalMessaging";
+import { PortalDisclosureSign } from "@/components/portal/PortalDisclosureSign";
 import { Progress } from "@/components/ui/progress";
 import { Zap, CheckCircle } from "lucide-react";
-import type { LoanType, DocumentType } from "@/lib/types/loan.types";
+import type { LoanType } from "@/lib/types/loan.types";
 import type { Database } from "@/lib/types/database.types";
 
 type Document = Database["public"]["Tables"]["documents"]["Row"];
 type RequirementRow = Database["public"]["Tables"]["document_requirements"]["Row"];
+type DisclosureRow = Database["public"]["Tables"]["disclosures"]["Row"];
 
 interface PortalPageProps {
   params: Promise<{ token: string }>;
@@ -19,13 +22,14 @@ export default async function PortalPage({ params }: PortalPageProps) {
 
   const { data: loan } = await supabase
     .from("loan_files")
-    .select("*, documents(*), document_requirements(*)")
+    .select("*, documents(*), document_requirements(*), disclosures(*)")
     .eq("portal_token", token)
     .single();
 
   type LoanRow = Database["public"]["Tables"]["loan_files"]["Row"] & {
     documents: Document[];
     document_requirements: RequirementRow[];
+    disclosures: DisclosureRow[];
   };
   const loanData = loan as unknown as LoanRow | null;
 
@@ -54,7 +58,11 @@ export default async function PortalPage({ params }: PortalPageProps) {
 
   const documents = (loanData.documents ?? []) as Document[];
   const requirements = (loanData.document_requirements ?? []) as RequirementRow[];
+  const disclosures = (loanData.disclosures ?? []) as DisclosureRow[];
   const hasFileCompletionChecklist = requirements.length > 0;
+  const pendingDisclosures = disclosures.filter(
+    (d) => d.status === "sent" || d.status === "viewed" || d.status === "pending"
+  );
 
   // Legacy progress for when no file completion checklist exists
   const uploaded = documents.filter((d) => d.status !== "pending").length;
@@ -127,6 +135,24 @@ export default async function PortalPage({ params }: PortalPageProps) {
             />
           </>
         )}
+
+        {/* Disclosures to sign */}
+        {disclosures.length > 0 && (
+          <PortalDisclosureSign
+            token={token}
+            disclosures={disclosures.map((d) => ({
+              id: d.id,
+              disclosure_type: d.disclosure_type,
+              status: d.status,
+              stage: d.stage,
+              sent_at: d.sent_at,
+              signed_at: d.signed_at,
+            }))}
+          />
+        )}
+
+        {/* Borrower messaging */}
+        <PortalMessaging token={token} />
       </main>
     </div>
   );

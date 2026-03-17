@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/follow-up",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/e2e-test",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

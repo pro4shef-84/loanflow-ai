@@ -8,12 +8,17 @@ import { maskObject } from "@/lib/utils/pii-masker";
 import { trackTokenUsage } from "@/lib/utils/token-tracker";
 import { estimateCost } from "@/lib/anthropic/token-router";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
+import { checkAiRateLimit, rateLimitResponse } from "@/lib/utils/ai-rate-limiter";
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
+
+    const { data: profile } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+    const rateLimit = await checkAiRateLimit(supabase, user.id, profile?.subscription_tier ?? "trial");
+    if (!rateLimit.allowed) return NextResponse.json(rateLimitResponse(rateLimit), { status: 429 });
 
     const body = await request.json();
     const { conditionId, documentId } = body;

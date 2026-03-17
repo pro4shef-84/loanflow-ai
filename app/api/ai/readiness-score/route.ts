@@ -11,6 +11,7 @@ import { estimateCost } from "@/lib/anthropic/token-router";
 import { successResponse, errorResponse } from "@/lib/types/api.types";
 import type { Database, Json } from "@/lib/types/database.types";
 import type { DocumentRequirementState, DocWorkflowState } from "@/lib/domain/enums";
+import { checkAiRateLimit, rateLimitResponse } from "@/lib/utils/ai-rate-limiter";
 
 type LoanFileRow = Database["public"]["Tables"]["loan_files"]["Row"];
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
@@ -73,6 +74,13 @@ export async function POST(request: NextRequest) {
     const serviceClient = await createServiceClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
+
+    // Rate limit check
+    const { data: profile } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+    const rateLimit = await checkAiRateLimit(supabase, user.id, profile?.subscription_tier ?? "trial");
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimitResponse(rateLimit), { status: 429 });
+    }
 
     const body = await request.json();
     const { loanFileId } = body;

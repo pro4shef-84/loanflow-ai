@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,8 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { formatDate } from "@/lib/utils/date-utils";
 import Link from "next/link";
+
+interface AiUsage {
+  used: number;
+  limit: number;
+  remaining: number;
+  resetAt: string;
+  totalCostUsd: number;
+  tier: string;
+}
 
 export default function SettingsPage() {
   const { user, profile } = useAuth();
@@ -20,6 +30,14 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+
+  useEffect(() => {
+    fetch("/api/user/ai-usage")
+      .then((r) => r.json())
+      .then((d) => setAiUsage(d.data ?? null))
+      .catch(() => {});
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +110,48 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {aiUsage && (
+        <Card>
+          <CardHeader>
+            <CardTitle>AI Usage This Month</CardTitle>
+            <CardDescription>
+              Resets {new Date(aiUsage.resetAt).toLocaleDateString([], { month: "long", day: "numeric" })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {aiUsage.used.toLocaleString()} / {aiUsage.limit.toLocaleString()} tokens
+              </span>
+              <span className="text-muted-foreground">
+                ${aiUsage.totalCostUsd.toFixed(4)} cost
+              </span>
+            </div>
+            <Progress
+              value={(aiUsage.used / aiUsage.limit) * 100}
+              className="h-2"
+            />
+            {aiUsage.remaining === 0 && (
+              <p className="text-xs text-red-600">
+                Monthly limit reached. Upgrade your plan for more AI capacity.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <Button asChild variant="outline">
+          <Link href="/settings/templates">Message Templates</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/import">Import from ARIVE</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/settings/health">System Health</Link>
+        </Button>
+      </div>
     </div>
   );
 }

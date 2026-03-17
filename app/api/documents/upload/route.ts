@@ -9,6 +9,7 @@ import { buildExtractDocumentPrompt } from "@/lib/anthropic/prompts/extract-docu
 import { CONFIDENCE_THRESHOLD, type RequiredDocType } from "@/lib/domain/enums";
 import type { ExtractedFields } from "@/lib/domain/rules/documentValidationRules";
 import type { Json } from "@/lib/types/database.types";
+import { ConditionAutoResolver } from "@/lib/agents/conditionAutoResolver";
 
 type DocumentType = Database["public"]["Tables"]["documents"]["Row"]["type"];
 type DocRow = Database["public"]["Tables"]["documents"]["Row"];
@@ -240,7 +241,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 6: Create escalation if confidence < threshold
+    // Step 6: Auto-resolve matching open conditions if document passed validation
+    if (validationResult.valid) {
+      const resolver = new ConditionAutoResolver(serviceClient);
+      await resolver.resolveForDocument({
+        loanFileId,
+        documentId: doc.id,
+        userId: user.id,
+        documentType: classifiedType,
+      }).catch((err) => {
+        console.error("[documents/upload] Condition auto-resolve failed:", err);
+      });
+    }
+
+    // Step 7: Create escalation if confidence < threshold
     if (confidenceScore < CONFIDENCE_THRESHOLD) {
       await supabase.from("escalations").insert({
         loan_file_id: loanFileId,

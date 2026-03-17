@@ -17,6 +17,7 @@ import { validateDocument } from "@/lib/domain/rules/documentValidationRules";
 import type { ExtractedFields } from "@/lib/domain/rules/documentValidationRules";
 import { WorkflowEngine } from "@/lib/workflow/workflowEngine";
 import { CONFIDENCE_THRESHOLD, type RequiredDocType } from "@/lib/domain/enums";
+import { ConditionAutoResolver } from "@/lib/agents/conditionAutoResolver";
 
 export interface ProcessDocumentResult {
   success: boolean;
@@ -40,6 +41,7 @@ export class DocumentIntelligenceAgent {
     fileName: string;
     mimeType: string;
     fileDescription?: string;
+    userId?: string;
   }): Promise<ProcessDocumentResult> {
     const db = await createServiceClient();
     const engine = new WorkflowEngine(db);
@@ -245,7 +247,21 @@ export class DocumentIntelligenceAgent {
         await engine.transitionRequirement(params.requirementId, "correction_required");
       }
 
-      // Step 10: Evaluate overall loan doc status
+      // Step 10: Auto-resolve matching open conditions if document passed
+      if (passed && params.userId) {
+        const resolver = new ConditionAutoResolver(db);
+        await resolver.resolveForDocument({
+          loanFileId: params.loanFileId,
+          documentId: params.documentId,
+          userId: params.userId,
+          documentType: aiResult.doc_type,
+        }).catch((err) => {
+          // Non-fatal — log and continue
+          console.error("[DocumentIntelligenceAgent] Condition auto-resolve failed:", err);
+        });
+      }
+
+      // Step 11: Evaluate overall loan doc status
       await engine.evaluateLoanDocStatus(params.loanFileId);
 
       return {

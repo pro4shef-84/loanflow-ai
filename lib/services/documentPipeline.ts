@@ -49,6 +49,7 @@ export interface PipelineInput {
   fileSize: number;
   mimeType: string;
   uploadedBy?: string;
+  userId?: string;
 }
 
 // ── Pipeline ─────────────────────────────────────────────────
@@ -165,6 +166,7 @@ export class DocumentPipeline {
         fileName: params.fileName,
         mimeType: params.mimeType,
         fileDescription: `Uploaded file: ${params.fileName} (${params.mimeType}, ${params.fileSize} bytes)`,
+        userId: params.userId,
       });
     } catch (error) {
       console.error("[DocumentPipeline] AI pipeline failed:", {

@@ -968,6 +968,174 @@ export interface Database {
         };
         Relationships: Relationships;
       };
+      test_runs: {
+        Row: {
+          id: string;
+          run_at: string;
+          total: number;
+          passed: number;
+          failed: number;
+          duration_ms: number | null;
+          triggered_by: string;
+          base_url: string | null;
+          status: "running" | "completed" | "failed";
+        };
+        Insert: {
+          id?: string;
+          run_at?: string;
+          total?: number;
+          passed?: number;
+          failed?: number;
+          duration_ms?: number | null;
+          triggered_by?: string;
+          base_url?: string | null;
+          status?: "running" | "completed" | "failed";
+        };
+        Update: {
+          id?: string;
+          run_at?: string;
+          total?: number;
+          passed?: number;
+          failed?: number;
+          duration_ms?: number | null;
+          triggered_by?: string;
+          base_url?: string | null;
+          status?: "running" | "completed" | "failed";
+        };
+        Relationships: Relationships;
+      };
+      test_results: {
+        Row: {
+          id: string;
+          run_id: string;
+          test_name: string;
+          endpoint: string;
+          method: string;
+          expected_status: number;
+          actual_status: number | null;
+          passed: boolean;
+          response_body: string | null;
+          error_message: string | null;
+          duration_ms: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          run_id: string;
+          test_name: string;
+          endpoint: string;
+          method?: string;
+          expected_status: number;
+          actual_status?: number | null;
+          passed?: boolean;
+          response_body?: string | null;
+          error_message?: string | null;
+          duration_ms?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          run_id?: string;
+          test_name?: string;
+          endpoint?: string;
+          method?: string;
+          expected_status?: number;
+          actual_status?: number | null;
+          passed?: boolean;
+          response_body?: string | null;
+          error_message?: string | null;
+          duration_ms?: number | null;
+          created_at?: string;
+        };
+        Relationships: Relationships;
+      };
+      heal_actions: {
+        Row: {
+          id: string;
+          run_id: string | null;
+          created_at: string;
+          failures_analyzed: number;
+          root_cause: string | null;
+          severity: "low" | "medium" | "high" | "critical" | null;
+          suggested_fix: string | null;
+          affected_files: string[] | null;
+          patch_diff: string | null;
+          telemetry_summary: string | null;
+          auto_applied: boolean;
+          status: "pending" | "applied" | "dismissed";
+        };
+        Insert: {
+          id?: string;
+          run_id?: string | null;
+          created_at?: string;
+          failures_analyzed?: number;
+          root_cause?: string | null;
+          severity?: "low" | "medium" | "high" | "critical" | null;
+          suggested_fix?: string | null;
+          affected_files?: string[] | null;
+          patch_diff?: string | null;
+          telemetry_summary?: string | null;
+          auto_applied?: boolean;
+          status?: "pending" | "applied" | "dismissed";
+        };
+        Update: {
+          id?: string;
+          run_id?: string | null;
+          created_at?: string;
+          failures_analyzed?: number;
+          root_cause?: string | null;
+          severity?: "low" | "medium" | "high" | "critical" | null;
+          suggested_fix?: string | null;
+          affected_files?: string[] | null;
+          patch_diff?: string | null;
+          telemetry_summary?: string | null;
+          auto_applied?: boolean;
+          status?: "pending" | "applied" | "dismissed";
+        };
+        Relationships: Relationships;
+      };
+      message_templates: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          category: string;
+          channel: "sms" | "email" | "both";
+          subject: string | null;
+          body: string;
+          variables: string[] | null;
+          is_default: boolean | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          category?: string;
+          channel?: "sms" | "email" | "both";
+          subject?: string | null;
+          body: string;
+          variables?: string[] | null;
+          is_default?: boolean | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          category?: string;
+          channel?: "sms" | "email" | "both";
+          subject?: string | null;
+          body?: string;
+          variables?: string[] | null;
+          is_default?: boolean | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: Relationships;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
