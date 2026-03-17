@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, User } from "lucide-react";
 import Link from "next/link";
 import type { Database } from "@/lib/types/database.types";
@@ -24,7 +27,32 @@ const TYPE_COLORS = {
 
 export default function ContactsPage() {
   const supabase = createClient();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", type: "borrower" as Contact["type"] });
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.first_name || !form.last_name) return;
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("contacts").insert({
+        user_id: user.id,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email || null,
+        phone: form.phone || null,
+        type: form.type,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    }
+    setForm({ first_name: "", last_name: "", email: "", phone: "", type: "borrower" });
+    setShowAdd(false);
+    setSaving(false);
+  };
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ["contacts"],
@@ -56,7 +84,7 @@ export default function ContactsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Contacts</h1>
           <p className="text-muted-foreground">{contacts?.length ?? 0} contacts</p>
         </div>
-        <Button>
+        <Button onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Contact
         </Button>
@@ -112,6 +140,49 @@ export default function ContactsPage() {
           ))}
         </div>
       )}
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Contact</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAdd} className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>First Name *</Label>
+                <Input value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} required />
+              </div>
+              <div className="space-y-1">
+                <Label>Last Name *</Label>
+                <Input value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} required />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Phone</Label>
+              <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+1 (555) 000-0000" />
+            </div>
+            <div className="space-y-1">
+              <Label>Type</Label>
+              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v as Contact["type"] }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="borrower">Borrower</SelectItem>
+                  <SelectItem value="realtor">Realtor</SelectItem>
+                  <SelectItem value="title">Title</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button type="button" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Add Contact"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
